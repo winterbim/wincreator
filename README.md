@@ -58,8 +58,9 @@ exit=0
 ```
 
 That is the entire mechanism. No LLM call, no network, no config. A
-14-line Python script stands between "the agent said it's done" and a
-merge.
+single stdlib-only Python script
+([`ledger_check.py`](skill/Skill_WinCreator/scripts/ledger_check.py), 91
+lines) stands between "the agent said it's done" and a merge.
 
 ## The three failure modes
 
