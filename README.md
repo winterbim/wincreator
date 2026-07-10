@@ -125,7 +125,9 @@ unmodified, demo output real, no placeholder credentials committed,
 attribution consistent) is a row in that file, and
 `.github/workflows/ledger.yml` runs `ledger_check.py` against it on every
 push. The green badge at the top of this page is that check, live, not a
-static image.
+static image — its
+[most recent run](https://github.com/winterbim/wincreator/actions/runs/29097155491)
+verified all rows in `PROOF_LEDGER.md` on GitHub's own runner.
 
 ## Support this project
 
