@@ -129,6 +129,53 @@ static image — its
 [most recent run](https://github.com/winterbim/wincreator/actions/runs/29097155491)
 verified all rows in `PROOF_LEDGER.md` on GitHub's own runner.
 
+## Bootstrap the evolution loop in your own project
+
+The skill itself (doctrine + gate + `SKEPTIC_CATCHES.md`) travels in the
+`.skill` package. The *evolution circuit* that lets the skill improve itself
+— the `.claude/agents/`, the `CLAUDE.md` wiring, the proposals queue — is
+repository scaffolding, so it travels via `git clone`, not the single-file
+`.skill`. To run that circuit inside one of your own projects:
+
+```bash
+# sources: your clone of this repo, and wherever you installed the skill
+WINCREATOR=/path/to/wincreator                 # git clone of this repo
+SKILL=~/.claude/skills/Skill_WinCreator        # where you installed the skill
+
+cd /path/to/your/project
+
+# 1. the four evolution agents
+mkdir -p .claude/agents
+cp "$WINCREATOR"/.claude/agents/wincreator-*.md .claude/agents/
+
+# 2. APPEND the loop section to your CLAUDE.md — never overwrite; your project
+#    may already have one (bimwin does), and cat >> preserves it
+cat "$WINCREATOR"/templates/CLAUDE.evolution.md >> CLAUDE.md
+
+# 3. create the project-level queue and catches log (only if absent)
+[ -f EVOLUTION_QUEUE.md ] || printf '# Evolution Queue\n\n_(empty — awaiting the first retro-analyst pass)_\n' > EVOLUTION_QUEUE.md
+[ -f SKEPTIC_CATCHES.md ] || printf '# Skeptic Catches — project log\n\n| Date | Class | Why missed | Question that would have caught it |\n|------|-------|------------|-------------------------------------|\n' > SKEPTIC_CATCHES.md
+
+# 4. the ONLY install smoke test:
+python3 "$SKILL"/scripts/ledger_check.py --self-test     # -> self-test: 20/20 passed
+```
+
+Every command above was executed in a virgin directory before being
+published here (`PROOF_LEDGER-evolution.md`, cycle 4). Two things a fresh
+setup must know:
+
+- **`--catches` is STALE at day zero, and that is correct.** A new project
+  has no catches yet, so
+  `ledger_check.py --catches ./SKEPTIC_CATCHES.md` returns `CATCHES STALE`,
+  exit 1 — the expected state, not a broken install. That gate only becomes
+  meaningful after real loops feed the log. Use `--self-test` (not
+  `--catches`) as the install check.
+- **Two `SKEPTIC_CATCHES.md` can exist; the authority is decided.** The one
+  in `~/.claude/skills/Skill_WinCreator/` is read-only inherited heritage;
+  your project's `./SKEPTIC_CATCHES.md` is the live log the retro-analyst
+  writes. A Meso+ loop re-reads **both** at its start. The full rule is in
+  `templates/CLAUDE.evolution.md`, which step 2 appends to your `CLAUDE.md`.
+
 ## Support this project
 
 WinCreator is free and MIT-licensed. If it saved you from shipping an
