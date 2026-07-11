@@ -101,3 +101,31 @@ carries a valid status in its Status column but sits outside the table —
 detached by a blank line, or orphaned by a header typo — is flagged rather
 than silently skipped, so a `CLAIMED` row can never escape the audit by
 being visually separated.
+
+Since v2.5 (EVO-005), the parser is structurally aware:
+
+- lines inside ``` or ~~~ fenced code blocks are skipped, so a ledger example
+  written in the documentation is not mistaken for a live ledger;
+- a foreign table is recognized by its header+separator, so a non-ledger
+  table that happens to have a column named "Status" (a roadmap, a kanban)
+  does NOT trip the orphan check — its rows belong to their own table;
+- orphan detection needs only the Status column, so a `CLAIMED` row whose
+  empty Evidence column was omitted (5 cells) is still caught.
+
+**Format requirement (documented limit):** a ledger row must use both a
+leading and a trailing pipe (`| … |`). A row missing an edge pipe is not
+recognized as a table row and is skipped — the tool does not parse pipe-less
+lines, because that would mis-read ordinary prose containing "|". If a row
+seems ignored, check its edge pipes first.
+
+**Best-effort orphan detection (documented limit).** Distinguishing a
+detached ledger row from a row belonging to another table cannot be decided
+from a single row's shape. The gate does its best (blank-line and header
+tracking), but a ledger row glued with NO blank line directly under a foreign
+table is read as part of that table and will not be audited. Practical rule:
+**keep the ledger as one contiguous table, and separate it from any other
+table with a blank line.** Do not append ledger rows onto an unrelated table.
+This is a deliberate stopping point: two prior attempts to make the heuristic
+airtight each traded one false verdict for its opposite, so the project
+declined to add further positional heuristics. The Skeptic remains the
+backstop for anything the structural gate cannot see — as it is meant to be.

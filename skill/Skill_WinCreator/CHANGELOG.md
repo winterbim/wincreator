@@ -4,6 +4,40 @@ Version line of the skill itself (distinct from the repository release line
 in the root `CHANGELOG.md`). Semver: patch = clarification, minor = new
 rule/defense, major = protocol change.
 
+## [2.5.0] — 2026-07-11
+
+Proposal EVO-005, from self-improvement cycle 3. A Two-Failure escalation:
+the v2.4 orphan heuristic failed at the row level in both directions, so the
+fix moved up to parser structure. The cycle-3 red-team found that v2.4's
+EVO-004 had itself introduced a regression.
+
+### Fixed
+- **False positive (HIGH), regression from EVO-004**: a legitimate foreign
+  table with a column named "Status" (roadmap/kanban/CI table) made a valid
+  ledger FAIL — its rows were flagged as orphans, breaking the documented
+  fix-B promise ("a ledger can live in a file containing other tables"). The
+  parser now tracks table boundaries (header+separator): rows under a
+  non-ledger header are ignored and never trigger the orphan check.
+- **False negative**: a 5-cell orphan (a CLAIMED row whose empty Evidence
+  column was omitted) escaped the audit. Orphan detection now needs only the
+  status column (>=5 cells).
+- **False positive**: a ledger example inside a ``` / ~~~ code fence was
+  parsed as live rows — the checker even mis-parsed 3 "rows" out of its own
+  spec doc's example block. Fenced blocks are now skipped.
+- **`--catches` inconsistency**: a valid 3-column catches table read STALE
+  (row check required >=4 cells while the header allowed >=2). Aligned to >=2.
+
+### Known limit (documented, not silently passed)
+- Ledger rows must use leading AND trailing pipes. A row missing an edge pipe
+  is not recognized (parsing pipe-less lines would mis-read prose containing
+  "|"). This is now stated in `references/proof-ledger.md` rather than being a
+  silent trap. Deliberately not code-fixed: adding another positional
+  heuristic is exactly what EVO-004 showed to be fragile.
+
+### Added
+- `--self-test` cases `foreign_status_col_not_orphan`, `orphan_5cell_caught`,
+  `fenced_example_ignored`, `catches_3col_alive` (suite now 20 cases).
+
 ## [2.4.0] — 2026-07-11
 
 Proposal EVO-004, from self-improvement cycle 2 (a red-team audit of v2.3.0).

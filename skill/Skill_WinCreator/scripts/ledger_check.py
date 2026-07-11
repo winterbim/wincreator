@@ -87,33 +87,66 @@ def _is_ledger_header(cells) -> bool:
 
 def _looks_like_ledger_row(cells) -> bool:
     """A row that carries a valid ledger status in column 5 is almost
-    certainly a ledger row (foreign tables don't). Used to catch rows that
-    were detached from their table by a blank line or a header typo."""
-    return len(cells) >= 6 and _strip_emphasis(cells[4]).upper() in VALID_STATUSES
+    certainly a detached ledger row. Column 5 (index 4) holds the status
+    whether or not the Evidence column is present, so >=5 cells suffices —
+    this catches a CLAIMED row whose empty Evidence column was omitted."""
+    return len(cells) >= 5 and _strip_emphasis(cells[4]).upper() in VALID_STATUSES
+
+
+_FENCE = re.compile(r"^\s*(```|~~~)")
+
+
+def _is_separator(cells) -> bool:
+    nonempty = [c for c in cells if c]
+    return bool(nonempty) and all(re.fullmatch(r":?-{3,}:?", c) for c in nonempty)
 
 
 def parse_ledger_rows(text):
-    """Yield (line_no, cells, orphan) for data rows. orphan=True flags a
-    ledger-like row sitting OUTSIDE a recognized ledger table (v2.4 EVO-004):
-    a blank line splitting the table, or a header typo, used to silently drop
-    a CLAIMED row would otherwise read CLEAN. The blank-line-ends-table rule
-    stays (it isolates foreign tables — fix B); orphan rows are flagged, not
-    silently skipped."""
-    in_ledger = False
+    """Yield (line_no, cells, orphan) for data rows. Structurally aware since
+    v2.5 (EVO-005), after the v2.4 orphan heuristic proved both too aggressive
+    and too lax (a Two-Failure escalation from row-level patch to parser-level):
+
+    - lines inside ``` / ~~~ fenced code blocks are skipped — a ledger example
+      in the docs is not a live ledger (fixes false positives incl. the spec
+      file mis-parsing its own example);
+    - a table starts at a header row followed by a separator; rows under a
+      NON-ledger header (a foreign table, even one with a 'Status' column) are
+      ignored (fix B) and never trigger the orphan check;
+    - a ledger-status-bearing row sitting OUTSIDE any table is flagged as
+      orphan, so a CLAIMED row detached by a blank line or a header typo cannot
+      escape the audit.
+    """
+    in_fence = in_ledger = in_foreign = False
+    prev = None  # previous content row — a candidate header, confirmed by a separator
     for i, line in enumerate(text.splitlines(), 1):
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            in_ledger = in_foreign = False
+            prev = None
+            continue
+        if in_fence:
+            continue
         cells = _split_row(line)
         if cells is None:
-            in_ledger = False  # blank/non-table line ends the table
+            in_ledger = in_foreign = False  # blank/non-table line ends the table
+            prev = None
             continue
-        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
-            continue  # separator row: keep current table state
-        if _is_ledger_header(cells):
-            in_ledger = True
+        if _is_separator(cells):
+            if prev is not None:
+                if _is_ledger_header(prev):
+                    in_ledger, in_foreign = True, False
+                else:
+                    in_ledger, in_foreign = False, True
+            prev = None
             continue
+        # a content row
         if in_ledger:
             yield i, cells, False
+        elif in_foreign:
+            pass  # foreign-table data row — not part of the ledger (fix B)
         elif _looks_like_ledger_row(cells):
-            yield i, cells, True  # ledger-like row outside any table
+            yield i, cells, True  # a ledger-like row floating outside any table
+        prev = cells
 
 
 def check_text(text, label="ledger"):
@@ -203,20 +236,29 @@ def check_catches_text(text):
     v2.3 EVO-003: schema-gated like the ledger parser — only rows under a real
     catches header (Date | Class(e)...) are counted, so a foreign table that
     happens to carry an ISO date in column 0 no longer reads as ALIVE (the v2
-    fix B hardening, finally carried over to this newer surface)."""
+    fix B hardening, finally carried over to this newer surface).
+    v2.5 EVO-005: skip fenced code blocks; a catch row needs only >=2 cells
+    (date + class) to match the >=2 header rule (the >=4 requirement rejected a
+    valid 3-column catches table — an internal inconsistency)."""
     rows = 0
-    in_catches = False
+    in_catches = in_fence = False
     for line in text.splitlines():
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            in_catches = False
+            continue
+        if in_fence:
+            continue
         cells = _split_row(line)
         if cells is None:
             in_catches = False  # blank/non-table line ends the table
             continue
-        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
+        if _is_separator(cells):
             continue  # separator row: keep table state
         if _is_catch_header(cells):
             in_catches = True
             continue
-        if in_catches and len(cells) >= 4 and ISO_DATE.search(cells[0]) and cells[1].strip():
+        if in_catches and len(cells) >= 2 and ISO_DATE.search(cells[0]) and cells[1].strip():
             rows += 1
     return rows >= 1, rows
 
@@ -275,6 +317,19 @@ SELF_TESTS = [
     ("foreign_6col_not_orphan",
      "| A | B | C | D | E | F |\n|--|--|--|--|--|--|\n| 1 | 2 | 3 | 4 | 5 | 6 |\n\n" + HDR +
      "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
+    # v2.5 EVO-005: parser-level fixes after the v2.4 orphan heuristic proved
+    # both too aggressive (foreign 'Status' column) and too lax (5-cell / fenced).
+    ("foreign_status_col_not_orphan",
+     "| Task | Owner | Priority | Due | Status | Notes |\n"
+     "|------|-------|----------|-----|--------|-------|\n"
+     "| Rewrite | wina | high | Q3 | PENDING | later |\n\n" + HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
+    ("orphan_5cell_caught", HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n\n"
+     "| P2 | Micro | broken | test | CLAIMED |\n", True),
+    ("fenced_example_ignored",
+     "```markdown\n| EX | Micro | demo | test | CLAIMED | |\n```\n\n" + HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
 ]
 
 # v2.1 EVO-001: cover the --catches retro-loop checker in the same suite.
@@ -289,6 +344,11 @@ CATCH_TESTS = [
     ("catches_foreign_table_stale",
      "| Date | Event | Who | Notes |\n|------|-------|-----|-------|\n"
      "| 2026-07-11 | shipped | wina | not a skeptic catch at all |\n", False),
+    # v2.5 EVO-005: a valid 3-column catches table must read ALIVE (was STALE
+    # due to the >=4-cell inconsistency).
+    ("catches_3col_alive",
+     "| Date | Classe | Comment |\n|------|--------|---------|\n"
+     "| 2026-07-11 | doc | note |\n", True),
 ]
 
 

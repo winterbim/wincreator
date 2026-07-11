@@ -87,6 +87,48 @@ QUEUED → APPLIED (version, date) | REJECTED (motif).
 - **Test de véracité** : self-test `orphan_ledger_row_caught` (caught) +
   `foreign_6col_not_orphan` (clean) ; suite 14 → 16.
 
+## EVO-005 — durcissement parser (Two-Failure escalade depuis EVO-004)
+
+- **Statut** : APPLIED (v2.5.0, 2026-07-11)
+- **[AUDIT]** 2 échecs de l'heuristique orpheline au niveau ligne (EVO-004
+  shippé au cycle 2 ; cycle 3 : faux positif BUG1 + faux négatifs BUG2/BUG3)
+  → la cause vivait un niveau au-dessus : le parser n'était pas conscient des
+  frontières de table ni des blocs code. Escalade Micro → Meso, conforme à la
+  Two-Failure Rule.
+- **Défauts corrigés (tous reproduits avant/après)** :
+  - BUG1 (faux positif HAUTE, régression d'EVO-004) : table étrangère avec
+    colonne "Status" → ledger valide rejeté. Fix : suivi header+séparateur ;
+    les lignes sous un header non-ledger sont ignorées (fix B restauré).
+  - BUG2 (faux négatif) : orphelin à 5 cellules raté. Fix : orphan gate ≥5.
+  - BUG4 (faux positif) : exemple ledger dans un bloc ``` parsé (+ landmine :
+    la spec elle-même mal parsée). Fix : saut des fences ``` / ~~~.
+  - MINOR5 : table --catches à 3 colonnes lue STALE. Fix : ligne catch ≥2 cell.
+- **Limite documentée (PAS un code-fix)** : BUG3 — ligne sans pipe de bord
+  droppée. Ajouter une heuristique pour la rattraper reproduirait la fragilité
+  d'EVO-004 ; consignée comme exigence de format dans proof-ledger.md.
+- **Test de véracité** : 4 nouveaux self-tests + 4 fichiers red-team rejoués
+  (BUG1→CLEAN, BUG2→exit1, BUG4→CLEAN, spec doc→exit2) ; suite 16→20.
+
+## EVO-006 — DÉCLINÉE (décision de niveau, pas un bug non corrigé)
+
+- **Statut** : DECLINED (décision Macro, 2026-07-11), consignée avant tout patch.
+- **Trouvaille (réelle, reproduite par le Skeptic sur v2.5.0)** : une ligne
+  CLAIMED collée SANS ligne vide sous une table étrangère est avalée comme
+  ligne de cette table → `LEDGER CLEAN` exit 0 (faux négatif). Miroir exact du
+  faux positif qu'EVO-004 avait créé et qu'EVO-005 a corrigé.
+- **[AUDIT] Two-Failure (étape 2 — la gate est-elle la bonne ?)** : EVO-004 a
+  échoué comme faux positif, EVO-005 comme faux négatif symétrique. La
+  distinction "ligne détachée du ledger" vs "ligne d'une autre table" est
+  **indécidable à partir d'une seule ligne**. Ajouter une 3e heuristique
+  positionnelle rééchangerait un faux contre son opposé — fragilité, pas
+  fiabilité.
+- **Décision** : NE PAS coder de nouveau patch. Documenter la limite (fait,
+  proof-ledger.md), garder le Skeptic comme backstop (rôle explicitement prévu
+  par la doctrine), et respecter l'invariant : *un système auto-modifiant qui
+  peut ajouter de la fragilité à ses propres gates ne doit pas le faire sans
+  raison prouvée.* La convergence ici n'est pas "plus de bugs" mais "ce défaut
+  est intrinsèque à une gate structurelle ; le bon remède est écrit, pas codé".
+
 ## Différé (loggé, PAS opéré ce cycle — retenue délibérée)
 
 - **Header ledger « tout ou rien »** : une faute de frappe dans une colonne du
