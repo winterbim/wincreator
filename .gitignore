@@ -4,3 +4,7 @@ launch/
 # Internal working docs for the v2 auto-evolution pass (kept local).
 HANDOFF-wincreator-v2.md
 PROMPT-wincreator-auto-evolution.md
+
+# Python bytecode
+__pycache__/
+*.pyc
