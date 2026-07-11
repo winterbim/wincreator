@@ -79,10 +79,12 @@ Instead:
 2. Start a clearly labeled section: **"Skeptic pass:"**. In that section,
    re-read ONLY the claim, gate, and raw evidence, and actively argue why
    the claim might still be false. Name at least one concrete attack.
-3. Only after that pass, write the status — and prefer PENDING over a
+3. A pass that names no concrete attack is void — restart it. There is
+   always at least a generalization risk to name.
+4. Only after that pass, write the status — and prefer PENDING over a
    self-graded EVIDENCED whenever the proof was not directly observed in the
    session.
-4. If stakes are high, say plainly: "single-context verification is weaker;
+5. If stakes are high, say plainly: "single-context verification is weaker;
    consider re-running the Skeptic in a fresh conversation with only the
    claim + gate + evidence pasted in." That fresh-context re-run is a real,
    practical approximation of separation available to every user.

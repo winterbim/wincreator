@@ -1,5 +1,6 @@
 ---
 name: skill-wincreator
+version: 2.1.0
 description: >-
   Turns any non-trivial engineering task, in any language, stack, or domain
   (backend, frontend, data, infra, hardware, BIM, ops, anything), into a
@@ -107,11 +108,13 @@ compacted.
 ```
 [LOOP] level=Meso weight=Construction task="FM export module"
 [GATE] full-dataset run + diff vs 3 reference cases
-[LEDGER] 2 EVIDENCED / 1 PENDING / 0 CLAIMED
+[LEDGER] 2 EVIDENCED / 1 PENDING / 0 CLAIMED / 1 WAIVED
 [NEXT] builder: implement error path for missing lots
 ```
 
-Four lines, never more. If you notice the panel contradicting what you were
+Four lines, never more (a fifth `[AUDIT]` line appears only after a
+Two-Failure level audit — see below). WAIVED count is mandatory: waived
+debt that leaves the panel becomes invisible debt. If you notice the panel contradicting what you were
 about to do, the panel wins — that contradiction IS the context rot being
 caught.
 
@@ -176,7 +179,10 @@ subagent using the role prompt in `references/agents.md`.
 **Without subagents** (plain chat): honest degradation — an explicit,
 labeled "Skeptic pass:" attacking your own claim before writing any status;
 prefer `PENDING` over a self-graded `EVIDENCED` whenever the proof was not
-directly observed. A fresh conversation given only claim + gate + evidence
+directly observed. **A Skeptic pass that names no concrete attack is void**:
+"nothing to report" is not a verdict, it is the optimism leak wearing a
+Skeptic costume. If no attack can be named, write the strongest reason the
+evidence might not generalize — there is always one. A fresh conversation given only claim + gate + evidence
 is a practical approximation of true separation available to every user.
 
 ## The Two-Failure Rule (defense against stuck loops)
@@ -195,6 +201,8 @@ Stop and run a level audit before touching the code again:
    look like a pass.
 3. Then either escalate to the parent level with what was learned, or retry
    once with a genuinely different approach — stated as such.
+4. Record the audit in one panel line so it is checkable later:
+   `[AUDIT] 2 fails at Micro → cause was Meso interface; escalating`.
 
 Two failures is data. Six failures is a session wasted on the wrong level.
 
@@ -226,6 +234,33 @@ A skill that claims to enforce proof but lets the AI hallucinate an
 unobserved verification is worse than no skill: it manufactures false
 confidence.
 
+## The Retro Loop (the skill improves itself)
+
+Every Skeptic `INSUFFICIENT` verdict is paid-for knowledge. Do not let it
+evaporate when the session ends:
+
+1. Keep a `SKEPTIC_CATCHES.md` next to the ledger: one line per catch —
+   *what class of gap it was, why the Builder missed it, what question would
+   have caught it earlier*.
+   Example: `2026-07-11 | promised-but-untested behavior | docstring said
+   ValueError, no test proved it | ask: "does every promise in the interface
+   have an executed check?"`
+2. At the start of any Meso+ loop, re-read the catches file (if present) and
+   fold recurring patterns into the gate definition — the gate of loop N+1
+   inherits the failures of loop N.
+3. Periodically (or when the user asks for it), fold stable patterns back
+   into this skill itself: a recurring catch class becomes a checklist line
+   in `references/gate-checklist-generique.md`. That is the recursive
+   improvement path — mechanical, evidence-driven, never aspirational.
+
+The skill's own tooling obeys the same law: `python scripts/ledger_check.py
+--self-test` runs the embedded adversarial suite that once broke v1 of the
+script. Run it before trusting the mechanical gate — a verifier that was
+never itself attacked is an unverified claim. `--catches` closes the loop
+one turn further: it fails if `SKEPTIC_CATCHES.md` holds no well-formed
+catch, making the retro-loop itself machine-checkable — no catches, no
+evolution, and now the gate can say so.
+
 ## Protocol summary
 
 1. Classify: level + weight, stated in one line.
@@ -239,7 +274,9 @@ confidence.
 7. Gate passed → report up explicitly with what was proven.
 8. Proof not executable → PENDING, never assumed.
 9. End of Meso loop: `python scripts/ledger_check.py` as the final
-   mechanical gate.
+   mechanical gate (`--self-test` first if the script is newly installed).
+10. Skeptic catch occurred → one line in `SKEPTIC_CATCHES.md` before
+    closing the loop. The next loop's gate inherits it.
 
 References — read when the situation calls for them:
 - `references/worked-example.md` — a complete real session transcript,

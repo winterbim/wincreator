@@ -68,5 +68,14 @@ it, machine-checkable, and cheap enough (one table) to actually be kept.
 catches forgotten CLAIMED rows, empty evidence, and invalid statuses — the
 common, silent failures. It cannot tell whether the evidence text is
 truthful; that is exactly the Skeptic role's job (`references/agents.md`).
-Also note: markdown tables require pipes inside cells to be escaped as `\|`,
-per standard markdown.
+What it DOES enforce since v2 (each rule born from a real adversarial test,
+replayable via `ledger_check.py --self-test`):
+
+- pipes inside cells escaped as `\|` are parsed correctly (v1 choked on
+  the very escaping this spec requires — a doc↔tool contradiction);
+- only tables matching the ledger header are checked, so a ledger can live
+  in a file containing other markdown tables;
+- `**EVIDENCED**` and other emphasis around statuses is tolerated;
+- an EVIDENCED row must contain an execution marker (command, date, path,
+  output fragment). "ça marche bien" is 14 characters of nothing: prose
+  alone is not proof.

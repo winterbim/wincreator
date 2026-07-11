@@ -1,2 +1,6 @@
 # Local go-to-market working material — not part of the published skill.
 launch/
+
+# Internal working docs for the v2 auto-evolution pass (kept local).
+HANDOFF-wincreator-v2.md
+PROMPT-wincreator-auto-evolution.md
