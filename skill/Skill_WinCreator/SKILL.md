@@ -1,6 +1,6 @@
 ---
 name: skill-wincreator
-version: 2.1.0
+version: 2.3.0
 description: >-
   Turns any non-trivial engineering task, in any language, stack, or domain
   (backend, frontend, data, infra, hardware, BIM, ops, anything), into a

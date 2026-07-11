@@ -4,6 +4,45 @@ Version line of the skill itself (distinct from the repository release line
 in the root `CHANGELOG.md`). Semver: patch = clarification, minor = new
 rule/defense, major = protocol change.
 
+## [2.3.0] — 2026-07-11
+
+Proposal EVO-003, produced by the evolution circuit applied to v2.1.0 (a
+red-team audit of the verifier itself).
+
+### Fixed
+- `--catches` is now schema-gated like the ledger parser: only rows under a
+  real catches header (`Date | Class(e)…`) are counted. A foreign table with
+  an ISO date in column 0 no longer reads as `CATCHES ALIVE`. This is the v2
+  fix B hardening finally carried to the newer surface — the exact recurring
+  "a verifier shipped without being verified" meta-class (lineage of EVO-001).
+- `_strip_emphasis` now also handles `~~strike~~`, and is applied only to the
+  Status token (not every cell), so Evidence ending in a backtick-wrapped
+  command keeps its execution marker. (This corrected a regression the
+  `--self-test` caught during the v2.2 work — the gate defended itself.)
+
+### Added
+- `--self-test` case `catches_foreign_table_stale`.
+
+## [2.2.0] — 2026-07-11
+
+Proposal EVO-002, from the same red-team audit. Two HIGH false-negatives.
+
+### Fixed
+- The spec's per-status evidence rules are now enforced symmetrically. v1/v2
+  enforced the "must contain" rule only for EVIDENCED; a vague **PENDING**
+  (no command) or **WAIVED** (no date) passed as `LEDGER CLEAN`, exit 0, on a
+  ledger the spec's own Status-semantics section defines as invalid. PENDING
+  now requires a command marker, WAIVED requires an ISO date.
+
+### Added
+- `--self-test` cases `pending_no_command_caught`,
+  `pending_with_command_still_ok`, `waived_no_date_caught`,
+  `waived_with_date_ok` (suite now 14 cases). Guards against over-rejection:
+  the spec's own valid PENDING/WAIVED examples stay CLEAN.
+
+Source catches (SKEPTIC_CATCHES.md, 2026-07-11): "enforcement asymétrique
+spec↔outil (PENDING)" and "(WAIVED)".
+
 ## [2.1.0] — 2026-07-11
 
 Produced by the auto-evolution circuit itself (proposal EVO-001 in

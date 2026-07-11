@@ -79,3 +79,18 @@ replayable via `ledger_check.py --self-test`):
 - an EVIDENCED row must contain an execution marker (command, date, path,
   output fragment). "ça marche bien" is 14 characters of nothing: prose
   alone is not proof.
+
+Since v2.2 (EVO-002), the per-status "must contain" rules are enforced
+symmetrically, not only for EVIDENCED:
+
+- a PENDING row must contain a command marker (the exact command handed to
+  the developer). A vague "we'll get to it later" is rejected.
+- a WAIVED row must contain a date (the ISO date of the user's decision).
+  A dateless "user said skip it" is rejected.
+
+Both are structural proxies, honestly limited like the EVIDENCED marker:
+they check the required element is present, not that it is faithful — that
+stays the Skeptic's job. Since v2.3 (EVO-003), `--catches` is schema-gated
+the same way the ledger parser is: only rows under a real catches header
+(`Date | Class(e)…`) count, so a foreign table with an ISO date no longer
+reads as a live catch.

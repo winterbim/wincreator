@@ -20,6 +20,14 @@ from EVO-001: the recurring meta-defect was "a verifier shipped without
 being verified" — so the verifier now also checks the file that feeds its
 own improvement.
 
+v2.2 EVO-002: the spec's per-status evidence rules are now enforced
+symmetrically — PENDING must carry a command marker, WAIVED must carry a
+date. v1/v2 enforced this only for EVIDENCED (asymmetric enforcement was a
+false-negative: a vague PENDING/WAIVED passed as CLEAN).
+v2.3 EVO-003: --catches is schema-gated like the ledger parser, so a foreign
+table with an ISO date no longer reads as ALIVE (fix B carried to the newer
+surface — the exact "verifier shipped unverified" class, recurring).
+
 Usage:
     python ledger_check.py [PROOF_LEDGER.md]     (default: PROOF_LEDGER.md)
     python ledger_check.py --self-test           (run embedded adversarial suite)
@@ -41,13 +49,24 @@ EXEC_MARKER = re.compile(
     r"|passed|failed|ok\b.*\d|#\d+|http)", re.IGNORECASE)
 
 SPLIT_UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def _clean(cell: str) -> str:
-    """Strip markdown emphasis/code wrapping and unescape pipes."""
-    c = cell.strip()
-    c = re.sub(r"^[*_`]+|[*_`]+$", "", c).strip()
-    return c.replace("\\|", "|")
+    """Unescape pipes and trim whitespace. Emphasis is NOT stripped here —
+    only the Status value is de-emphasised (see _strip_emphasis), so that
+    Evidence ending in a backtick-wrapped command keeps its execution marker
+    (stripping it here was a v2.2 regression the self-test caught)."""
+    return cell.strip().replace("\\|", "|")
+
+
+_EMPHASIS = re.compile(r"^[*_~`]+|[*_~`]+$")
+
+
+def _strip_emphasis(s: str) -> str:
+    """Strip surrounding markdown emphasis (**bold**, _italic_, `code`,
+    ~~strike~~) from a short token such as a status."""
+    return _EMPHASIS.sub("", s.strip()).strip()
 
 
 def _split_row(line: str):
@@ -91,7 +110,7 @@ def check_text(text, label="ledger"):
             continue
         rows_seen += 1
         row_id, _lvl, claim, _gate, status, evidence = cells[:6]
-        status_u = status.upper()
+        status_u = _strip_emphasis(status).upper()
         if status_u not in VALID_STATUSES:
             violations.append(f"line {line_no} [{row_id}]: unknown status '{status}'")
         elif status_u == "CLAIMED":
@@ -107,6 +126,22 @@ def check_text(text, label="ledger"):
                 f"line {line_no} [{row_id}]: EVIDENCED but no execution marker "
                 f"(command, date, path, output fragment) in Evidence: '{evidence[:60]}' "
                 f"— prose alone is not proof")
+        elif status_u == "PENDING" and not EXEC_MARKER.search(evidence):
+            # v2.2 EVO-002: the spec requires PENDING evidence to hold the exact
+            # command handed to the developer. Enforce it like EVIDENCED, not
+            # just the >=10-char check (asymmetric enforcement was the defect).
+            violations.append(
+                f"line {line_no} [{row_id}]: PENDING but no command marker in "
+                f"Evidence (spec: hold the exact command handed to the dev): "
+                f"'{evidence[:60]}'")
+        elif status_u == "WAIVED" and not ISO_DATE.search(evidence):
+            # v2.2 EVO-002: the spec requires WAIVED evidence to quote the user's
+            # words AND date. ISO date is the structural proxy (honestly limited,
+            # like EXEC_MARKER: it checks the date is present, not that the quote
+            # is faithful — that stays the Skeptic's job).
+            violations.append(
+                f"line {line_no} [{row_id}]: WAIVED but no date in Evidence "
+                f"(spec: quote the user's words and date): '{evidence[:60]}'")
     return violations, rows_seen
 
 
@@ -132,24 +167,35 @@ def check(path):
 
 
 # ------------------------------------------------------ retro-loop (--catches)
-CATCH_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+def _is_catch_header(cells) -> bool:
+    """A catches table starts with 'Date | Class(e)...' (EN or FR)."""
+    return (len(cells) >= 2 and cells[0].lower().startswith("date")
+            and cells[1].lower().startswith("class"))
 
 
 def check_catches_text(text):
     """Return (alive, rows). The retro-loop is 'alive' if the catches file
     holds >=1 well-formed dated catch row (ISO date + non-empty class).
     Stateless proxy for 'the file exists and grows', honestly limited:
-    it proves the loop is being fed, not that the catches are insightful."""
+    it proves the loop is being fed, not that the catches are insightful.
+
+    v2.3 EVO-003: schema-gated like the ledger parser — only rows under a real
+    catches header (Date | Class(e)...) are counted, so a foreign table that
+    happens to carry an ISO date in column 0 no longer reads as ALIVE (the v2
+    fix B hardening, finally carried over to this newer surface)."""
     rows = 0
+    in_catches = False
     for line in text.splitlines():
         cells = _split_row(line)
-        if cells is None or len(cells) < 4:
+        if cells is None:
+            in_catches = False  # blank/non-table line ends the table
             continue
         if all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
-            continue  # separator
-        if cells[0].lower().startswith("date"):
-            continue  # header
-        if CATCH_DATE.search(cells[0]) and cells[1].strip():
+            continue  # separator row: keep table state
+        if _is_catch_header(cells):
+            in_catches = True
+            continue
+        if in_catches and len(cells) >= 4 and ISO_DATE.search(cells[0]) and cells[1].strip():
             rows += 1
     return rows >= 1, rows
 
@@ -191,6 +237,15 @@ SELF_TESTS = [
      "| P2 | Micro | perf ok | bench | PENDING | command given: `cargo test parser` |\n", False),
     ("empty_evidence_caught", HDR +
      "| P3 | Micro | ok | test | WAIVED | ok |\n", True),
+    # v2.2 EVO-002: PENDING/WAIVED evidence rules enforced symmetrically.
+    ("pending_no_command_caught", HDR +
+     "| P4 | Micro | perf ok | bench | PENDING | we will get to it later, promise it is fine |\n", True),
+    ("pending_with_command_still_ok", HDR +
+     "| P4 | Micro | perf ok | bench | PENDING | command given: `cargo test parser::malformed` |\n", False),
+    ("waived_no_date_caught", HDR +
+     "| P5 | Micro | perf | bench | WAIVED | user said just skip it for now, no need to bother |\n", True),
+    ("waived_with_date_ok", HDR +
+     "| P6 | Micro | perf | bench | WAIVED | user 2026-07-11: \"ship without the benchmark\" |\n", False),
 ]
 
 # v2.1 EVO-001: cover the --catches retro-loop checker in the same suite.
@@ -201,6 +256,10 @@ CATCH_TESTS = [
     ("catches_alive_ok", CATCH_HDR +
      "| 2026-07-11 | doc↔outil | jamais exécuté | l'outil a-t-il été attaqué ? |\n", True),
     ("catches_stale_caught", CATCH_HDR, False),  # header only, no dated catch
+    # v2.3 EVO-003: a foreign table with an ISO date in col 0 must read STALE.
+    ("catches_foreign_table_stale",
+     "| Date | Event | Who | Notes |\n|------|-------|-----|-------|\n"
+     "| 2026-07-11 | shipped | wina | not a skeptic catch at all |\n", False),
 ]
 
 
