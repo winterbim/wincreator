@@ -94,3 +94,10 @@ stays the Skeptic's job. Since v2.3 (EVO-003), `--catches` is schema-gated
 the same way the ledger parser is: only rows under a real catches header
 (`Date | Class(e)…`) count, so a foreign table with an ISO date no longer
 reads as a live catch.
+
+Since v2.4 (EVO-004), keep all ledger rows in ONE contiguous table: a blank
+line ends the table (that is how foreign tables stay isolated). A row that
+carries a valid status in its Status column but sits outside the table —
+detached by a blank line, or orphaned by a header typo — is flagged rather
+than silently skipped, so a `CLAIMED` row can never escape the audit by
+being visually separated.

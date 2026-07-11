@@ -85,8 +85,20 @@ def _is_ledger_header(cells) -> bool:
     return all(l.startswith(k) for l, k in zip(lowered, EXPECTED_HEADER))
 
 
+def _looks_like_ledger_row(cells) -> bool:
+    """A row that carries a valid ledger status in column 5 is almost
+    certainly a ledger row (foreign tables don't). Used to catch rows that
+    were detached from their table by a blank line or a header typo."""
+    return len(cells) >= 6 and _strip_emphasis(cells[4]).upper() in VALID_STATUSES
+
+
 def parse_ledger_rows(text):
-    """Yield (line_no, cells) only for data rows of *ledger* tables."""
+    """Yield (line_no, cells, orphan) for data rows. orphan=True flags a
+    ledger-like row sitting OUTSIDE a recognized ledger table (v2.4 EVO-004):
+    a blank line splitting the table, or a header typo, used to silently drop
+    a CLAIMED row would otherwise read CLEAN. The blank-line-ends-table rule
+    stays (it isolates foreign tables — fix B); orphan rows are flagged, not
+    silently skipped."""
     in_ledger = False
     for i, line in enumerate(text.splitlines(), 1):
         cells = _split_row(line)
@@ -99,12 +111,21 @@ def parse_ledger_rows(text):
             in_ledger = True
             continue
         if in_ledger:
-            yield i, cells
+            yield i, cells, False
+        elif _looks_like_ledger_row(cells):
+            yield i, cells, True  # ledger-like row outside any table
 
 
 def check_text(text, label="ledger"):
     violations, rows_seen = [], 0
-    for line_no, cells in parse_ledger_rows(text):
+    for line_no, cells, orphan in parse_ledger_rows(text):
+        if orphan:
+            rows_seen += 1
+            violations.append(
+                f"line {line_no} [{cells[0]}]: ledger-like row (status "
+                f"'{cells[4]}') OUTSIDE any ledger table — detached by a blank "
+                f"line or a header typo, so it was escaping the audit")
+            continue
         if len(cells) < 6:
             violations.append(f"line {line_no}: {len(cells)} cells, expected 6")
             continue
@@ -246,6 +267,14 @@ SELF_TESTS = [
      "| P5 | Micro | perf | bench | WAIVED | user said just skip it for now, no need to bother |\n", True),
     ("waived_with_date_ok", HDR +
      "| P6 | Micro | perf | bench | WAIVED | user 2026-07-11: \"ship without the benchmark\" |\n", False),
+    # v2.4 EVO-002... EVO-004: an orphan ledger row detached by a blank line
+    # must NOT silently read CLEAN.
+    ("orphan_ledger_row_caught", HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n\n"
+     "| P2 | Micro | orphan | test | CLAIMED | |\n", True),
+    ("foreign_6col_not_orphan",
+     "| A | B | C | D | E | F |\n|--|--|--|--|--|--|\n| 1 | 2 | 3 | 4 | 5 | 6 |\n\n" + HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
 ]
 
 # v2.1 EVO-001: cover the --catches retro-loop checker in the same suite.

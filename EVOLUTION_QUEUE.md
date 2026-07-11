@@ -69,6 +69,24 @@ QUEUED → APPLIED (version, date) | REJECTED (motif).
 - **Test de véracité** : 1 nouveau CATCH_TEST (table étrangère avec date ISO →
   STALE) ; le vrai `SKEPTIC_CATCHES.md` reste ALIVE.
 
+## EVO-004 — ligne ledger orpheline (faux négatif HIGH)
+
+- **Statut** : APPLIED (v2.4.0, 2026-07-11)
+- **Pattern** : *faux négatif structurel — une ligne de ledger valide sort de
+  l'état de parsing et échappe à l'audit.* Découvert par le red-team du cycle 2
+  sur v2.3.0. Reproduit : `c1_orphan.md` (ligne CLAIMED après ligne vide) →
+  `LEDGER CLEAN` exit 0 ; même ligne sans la ligne vide → exit 1. Le pire cas
+  possible pour cet outil : une claim non prouvée passe.
+- **Cible** : `scripts/ledger_check.py`
+- **Patch** : `_looks_like_ledger_row` — une ligne à ≥6 cellules dont la col 5
+  est un statut valide, apparaissant HORS d'une table reconnue, est signalée
+  (détachée par une ligne vide, ou orpheline par faute de frappe du header).
+  La règle « ligne vide = fin de table » (isolation des tables étrangères,
+  fix B) est préservée : une table étrangère n'a jamais de statut ledger en
+  col 5 (prouvé par le self-test `foreign_6col_not_orphan`).
+- **Test de véracité** : self-test `orphan_ledger_row_caught` (caught) +
+  `foreign_6col_not_orphan` (clean) ; suite 14 → 16.
+
 ## Différé (loggé, PAS opéré ce cycle — retenue délibérée)
 
 - **Header ledger « tout ou rien »** : une faute de frappe dans une colonne du

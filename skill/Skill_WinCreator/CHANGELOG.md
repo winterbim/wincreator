@@ -4,6 +4,27 @@ Version line of the skill itself (distinct from the repository release line
 in the root `CHANGELOG.md`). Semver: patch = clarification, minor = new
 rule/defense, major = protocol change.
 
+## [2.4.0] — 2026-07-11
+
+Proposal EVO-004, from self-improvement cycle 2 (a red-team audit of v2.3.0).
+
+### Fixed
+- Orphan ledger row → false negative (HIGH). A row detached from its table
+  by a blank line (or a header typo) was silently skipped, so a `CLAIMED`
+  row below a blank line read `LEDGER CLEAN`, exit 0 — a real ledger a user
+  might write when grouping rows visually. Now a row that carries a valid
+  ledger status in column 5 but sits outside any recognized table is flagged.
+  The blank-line-ends-table rule (which isolates foreign tables — fix B) is
+  preserved; foreign tables never carry a ledger status in column 5, proven
+  by the `foreign_6col_not_orphan` self-test.
+
+### Added
+- `--self-test` cases `orphan_ledger_row_caught`, `foreign_6col_not_orphan`
+  (suite now 16 cases).
+
+Source catch (SKEPTIC_CATCHES.md, 2026-07-11): "ligne ledger orpheline après
+ligne vide, silencieusement ignorée".
+
 ## [2.3.0] — 2026-07-11
 
 Proposal EVO-003, produced by the evolution circuit applied to v2.1.0 (a
