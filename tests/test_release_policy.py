@@ -117,6 +117,21 @@ def test_official_validator_dependencies_are_installed_before_validation():
     assert workflow.index(dependency) < workflow.index(validator)
 
 
+def test_release_attestation_artifact_contains_its_bound_package_files():
+    workflow = (REPO / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    marker = "name: wincreator-release-attestation-${{ github.sha }}"
+    artifact_block = workflow[workflow.index(marker):workflow.index("  ci-success:")]
+    for path in (
+        "dist/skill.zip",
+        "dist/skill.zip.sha256",
+        "dist/wincreator.skill",
+        "dist/wincreator.skill.sha256",
+    ):
+        assert path in artifact_block
+
+
 def test_latest_release_must_match_expected_tag(release_policy):
     problems = release_policy.validate_release_state(
         expected_tag="v3.0.0",

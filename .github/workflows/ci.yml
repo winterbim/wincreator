@@ -137,12 +137,25 @@ jobs:
           python skill/wincreator/scripts/wincreator.py verify \
             --attest-dir "$RUNNER_TEMP/attestations" \
             --ledger "$RUNNER_TEMP/release-ledger.md"
+      - name: Stage portable release attestation bundle
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-artifact/dist"
+          cp -R "$RUNNER_TEMP/attestations" "$RUNNER_TEMP/release-artifact/attestations"
+          cp "$RUNNER_TEMP/release-ledger.md" "$RUNNER_TEMP/release-artifact/release-ledger.md"
+          cp dist/skill.zip "$RUNNER_TEMP/release-artifact/dist/skill.zip"
+          cp dist/skill.zip.sha256 "$RUNNER_TEMP/release-artifact/dist/skill.zip.sha256"
+          cp dist/wincreator.skill "$RUNNER_TEMP/release-artifact/dist/wincreator.skill"
+          cp dist/wincreator.skill.sha256 "$RUNNER_TEMP/release-artifact/dist/wincreator.skill.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: wincreator-release-attestation-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/attestations
-            ${{ runner.temp }}/release-ledger.md
+            ${{ runner.temp }}/release-artifact/attestations
+            ${{ runner.temp }}/release-artifact/release-ledger.md
+            ${{ runner.temp }}/release-artifact/dist/skill.zip
+            ${{ runner.temp }}/release-artifact/dist/skill.zip.sha256
+            ${{ runner.temp }}/release-artifact/dist/wincreator.skill
+            ${{ runner.temp }}/release-artifact/dist/wincreator.skill.sha256
           if-no-files-found: error
 
   ci-success:

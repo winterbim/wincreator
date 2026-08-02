@@ -140,6 +140,11 @@ be recorded.
 Run directories use microseconds plus a UUID and are created exclusively, so
 concurrent captures for one claim do not collide.
 
+Stored stdout/stderr paths, the ledger name, and the review capture reference
+are relative so an exported attestation bundle remains verifiable after it is
+moved or downloaded. Retain the `attestations/` tree, ledger, and every declared
+file at its recorded relative path inside the bundle.
+
 ## Output and privacy policy
 
 Apply literal/regex redaction before persistence. Hash the retained bytes, not

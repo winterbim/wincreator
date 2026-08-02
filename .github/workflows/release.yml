@@ -71,7 +71,14 @@ jobs:
           python skill/wincreator/scripts/wincreator.py verify \
             --attest-dir "$RUNNER_TEMP/attestations" \
             --ledger "$RUNNER_TEMP/release-ledger.md"
-          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/dist/wincreator-attestations.zip" attestations release-ledger.md)
+          mkdir -p "$RUNNER_TEMP/release-bundle/dist"
+          cp -R "$RUNNER_TEMP/attestations" "$RUNNER_TEMP/release-bundle/attestations"
+          cp "$RUNNER_TEMP/release-ledger.md" "$RUNNER_TEMP/release-bundle/release-ledger.md"
+          cp dist/skill.zip "$RUNNER_TEMP/release-bundle/dist/skill.zip"
+          cp dist/skill.zip.sha256 "$RUNNER_TEMP/release-bundle/dist/skill.zip.sha256"
+          cp dist/wincreator.skill "$RUNNER_TEMP/release-bundle/dist/wincreator.skill"
+          cp dist/wincreator.skill.sha256 "$RUNNER_TEMP/release-bundle/dist/wincreator.skill.sha256"
+          (cd "$RUNNER_TEMP/release-bundle" && zip -qr "$GITHUB_WORKSPACE/dist/wincreator-attestations.zip" attestations release-ledger.md dist)
           (cd dist && sha256sum wincreator-attestations.zip > wincreator-attestations.zip.sha256)
       - uses: actions/upload-artifact@v4
         with:

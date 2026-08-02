@@ -11,7 +11,7 @@ def test_literal_and_regex_secrets_are_redacted_before_storage(wincreator, ledge
         "-c",
         "import sys; print('token=abc123'); sys.stderr.write('password=hunter2')",
     ]
-    attestation, _path, _code = prove(
+    attestation, path, _code = prove(
         wincreator,
         ledger,
         tmp_path,
@@ -19,15 +19,19 @@ def test_literal_and_regex_secrets_are_redacted_before_storage(wincreator, ledge
         redact=["abc123"],
         redact_regex=[r"password=[^\\s]+"],
     )
-    stdout = (tmp_path / attestation["payload"]["stdout"]["path"]).read_text(encoding="utf-8")
-    stderr = (tmp_path / attestation["payload"]["stderr"]["path"]).read_text(encoding="utf-8")
+    stdout = Path(wincreator._resolve_recorded_path(
+        attestation["payload"]["stdout"]["path"], str(path)
+    )).read_text(encoding="utf-8")
+    stderr = Path(wincreator._resolve_recorded_path(
+        attestation["payload"]["stderr"]["path"], str(path)
+    )).read_text(encoding="utf-8")
     assert "abc123" not in stdout
     assert "hunter2" not in stderr
     assert "[REDACTED]" in stdout + stderr
 
 
 def test_oversized_output_is_truncated_with_original_and_stored_sizes(wincreator, ledger, tmp_path):
-    attestation, _path, _code = prove(
+    attestation, path, _code = prove(
         wincreator,
         ledger,
         tmp_path,
@@ -41,7 +45,7 @@ def test_oversized_output_is_truncated_with_original_and_stored_sizes(wincreator
 
 
 def test_no_output_body_writes_empty_logs_and_keeps_sizes(wincreator, ledger, tmp_path):
-    attestation, _path, _code = prove(
+    attestation, path, _code = prove(
         wincreator,
         ledger,
         tmp_path,
@@ -51,4 +55,5 @@ def test_no_output_body_writes_empty_logs_and_keeps_sizes(wincreator, ledger, tm
     record = attestation["payload"]["stdout"]
     assert record["original_bytes"] > 0
     assert record["stored_bytes"] == 0
-    assert (tmp_path / record["path"]).read_bytes() == b""
+    resolved = wincreator._resolve_recorded_path(record["path"], str(path))
+    assert Path(resolved).read_bytes() == b""

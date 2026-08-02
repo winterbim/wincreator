@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -43,7 +44,10 @@ def test_verify_rejects_tampered_capture_artifact(wincreator, ledger, tmp_path, 
         data["payload"]["capture"]["exit_code"] = 42
         path.write_text(json.dumps(data), encoding="utf-8")
     else:
-        (tmp_path / data["payload"][target]["path"]).write_text("tampered", encoding="utf-8")
+        artifact = wincreator._resolve_recorded_path(
+            data["payload"][target]["path"], str(path)
+        )
+        Path(artifact).write_text("tampered", encoding="utf-8")
 
     ok, problems = wincreator.verify_attestation(str(path))
     assert not ok
@@ -92,3 +96,52 @@ def test_verify_cli_rejects_ledger_with_zero_capture_targets(wincreator, ledger,
     assert code == 1
     assert "no capture attestation references" in output
     assert "VERIFY OK" not in output
+
+
+def test_capture_bundle_remains_verifiable_after_relocation(
+    wincreator, ledger, tmp_path
+):
+    source = tmp_path / "source"
+    source.mkdir()
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    bundled_ledger = bundle / "PROOF_LEDGER.md"
+    bundled_ledger.write_text(ledger.read_text(encoding="utf-8"), encoding="utf-8")
+
+    _attestation, path, code = wincreator.run_and_attest(
+        "P1",
+        ["python3", "-c", "print('portable capture')"],
+        ledger=str(bundled_ledger),
+        attest_dir=str(bundle / "attestations"),
+        cwd=str(source),
+        quiet=True,
+        tier="standard",
+    )
+    assert code == 0
+    wincreator.review_attestation(
+        path,
+        verdict="EVIDENCED",
+        reviewer="portable-skeptic",
+        ledger=str(bundled_ledger),
+    )
+    relative_attestation = Path(path).relative_to(bundle)
+
+    relocated = tmp_path / "downloaded-bundle"
+    shutil.move(str(bundle), relocated)
+    relocated_attestation = relocated / relative_attestation
+    document = json.loads(relocated_attestation.read_text(encoding="utf-8"))
+    assert not Path(document["payload"]["stdout"]["path"]).is_absolute()
+    assert not Path(document["payload"]["stderr"]["path"]).is_absolute()
+    assert not Path(document["payload"]["ledger"]).is_absolute()
+    review = json.loads(
+        (relocated_attestation.parent / "review.json").read_text(encoding="utf-8")
+    )
+    assert not Path(review["payload"]["capture_path"]).is_absolute()
+
+    ok, problems = wincreator.verify_attestation(str(relocated_attestation))
+    assert ok, problems
+    checked, problems = wincreator.verify_ledger_references(
+        str(relocated / "PROOF_LEDGER.md")
+    )
+    assert checked == 1
+    assert problems == []

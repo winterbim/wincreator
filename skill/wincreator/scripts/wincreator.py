@@ -473,7 +473,7 @@ def _resolve_recorded_path(recorded, attestation_path=None):
     native = recorded.replace("/", os.sep)
     if os.path.isabs(native) or re.match(r"^[A-Za-z]:[/\\]", recorded):
         return native
-    candidates = [os.path.join(os.getcwd(), native)]
+    candidates = []
     if attestation_path:
         current = os.path.abspath(os.path.dirname(attestation_path))
         for _ in range(10):
@@ -482,6 +482,7 @@ def _resolve_recorded_path(recorded, attestation_path=None):
             if parent == current:
                 break
             current = parent
+    candidates.append(os.path.join(os.getcwd(), native))
     return next((candidate for candidate in candidates if os.path.exists(candidate)), candidates[0])
 
 
@@ -668,11 +669,11 @@ def run_and_attest(
     else:
         capture_status = "CAPTURED_FAIL"
     for stream in (stdout_record, stderr_record):
-        stream["path"] = _recorded_path(stream["path"], cwd)
+        stream["path"] = portable_path(os.path.basename(stream["path"]))
     payload = {
         "tool_version": VERSION,
         "claim": claim,
-        "ledger": _recorded_path(ledger, cwd) if ledger else None,
+        "ledger": portable_path(os.path.basename(ledger)) if ledger else None,
         "builder": builder,
         "command": list(command),
         "command_string": shlex.join(list(command)),
@@ -794,7 +795,7 @@ def review_attestation(attestation_path, verdict, reviewer, ledger=None, automat
         "tool_version": VERSION,
         "claim": payload["claim"],
         "capture_digest": attestation["digest"]["value"],
-        "capture_path": _recorded_path(attestation_path, os.getcwd()),
+        "capture_path": portable_path(os.path.basename(attestation_path)),
         "capture_status": capture_status,
         "verdict": verdict,
         "reviewer": reviewer,
