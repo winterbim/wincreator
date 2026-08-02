@@ -306,16 +306,23 @@ def git_context(cwd):
     commit = _git(cwd, "rev-parse", "HEAD")
     if commit is None:
         return {"available": False}
-    status = _git(cwd, "status", "--porcelain=v1", "--untracked-files=all") or ""
+    status = _git(cwd, "status", "--porcelain=v1", "--untracked-files=all")
+    tree = _git(cwd, "rev-parse", "HEAD^{tree}")
+    branch = _git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    submodules = _git(cwd, "submodule", "status", "--recursive")
+    untracked_digest = _untracked_digest(cwd)
+    if (status is None or tree is None or branch is None
+            or submodules is None or untracked_digest is None):
+        return {"available": False}
     return {
         "available": True,
         "commit": commit,
-        "tree": _git(cwd, "rev-parse", "HEAD^{tree}"),
-        "branch": _git(cwd, "rev-parse", "--abbrev-ref", "HEAD"),
+        "tree": tree,
+        "branch": branch,
         "dirty": bool(status),
         "remote": _git(cwd, "config", "--get", "remote.origin.url"),
-        "submodules": _git(cwd, "submodule", "status", "--recursive") or "",
-        "untracked_digest": _untracked_digest(cwd),
+        "submodules": submodules,
+        "untracked_digest": untracked_digest,
     }
 
 
@@ -625,6 +632,10 @@ def run_and_attest(
             stderr_handle.write(capture_error.encode("utf-8"))
         stdout_raw, stdout_original = _read_bounded(stdout_handle, max_output_bytes)
         stderr_raw, stderr_original = _read_bounded(stderr_handle, max_output_bytes)
+    if tier == "regulated":
+        git_after = git_context(cwd)
+        if not git_after.get("available") or git_after != git:
+            capture_error = "Regulated gate changed Git state or Git inspection failed after execution"
     duration_ms = int((time.monotonic() - start_clock) * 1000)
     finished = utc_now()
     stdout_record = _stream_record(
@@ -1069,6 +1080,7 @@ def cmd_review(args):
             args.verdict,
             args.reviewer,
             ledger=None if args.no_ledger else args.ledger,
+            automatic=args.automatic,
         )
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
@@ -1204,6 +1216,11 @@ def build_parser():
     review.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
     review.add_argument("--ledger", default=DEFAULT_LEDGER)
     review.add_argument("--no-ledger", action="store_true")
+    review.add_argument(
+        "--automatic",
+        action="store_true",
+        help="mark a CI/tool review as automatic rather than independent human sign-off",
+    )
 
     verify = subparsers.add_parser("verify", help="verify captures, reviews, and ledger bindings")
     verify.add_argument("attestations", nargs="*")

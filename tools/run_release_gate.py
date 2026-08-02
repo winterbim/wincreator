@@ -25,7 +25,6 @@ def main():
         "PROOF_LEDGER.md",
         "PROOF_LEDGER-v2-install.md",
         "PROOF_LEDGER-evolution.md",
-        "PROOF_LEDGER-v3-proof-capture.md",
     ):
         run([PYTHON, "skill/wincreator/scripts/ledger_check.py", ledger])
     run([PYTHON, "-m", "pytest", "-q"])

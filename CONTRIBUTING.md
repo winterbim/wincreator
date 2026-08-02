@@ -14,11 +14,11 @@ python3 skill/wincreator/scripts/package_check.py skill/wincreator
 python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
 ```
 
-CI runs all of these on every push (`.github/workflows/ci.yml`) — the
-verifiers prove themselves before they are allowed to grade anything. If
-your change adds or modifies a claim about the skill's behavior, add a row
-to `PROOF_LEDGER.md` with real evidence. Prefer capturing it rather than
-writing it:
+CI runs all of these for every pull request and for pushes to `master`
+(`.github/workflows/ci.yml`) — the verifiers prove themselves before they are
+allowed to grade anything. If your change adds or modifies a claim about the
+skill's behavior, add a row to `PROOF_LEDGER.md` with real evidence. Prefer
+capturing it rather than writing it:
 
 ```
 python3 skill/wincreator/scripts/wincreator.py prove P-XX \

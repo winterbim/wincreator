@@ -59,3 +59,57 @@ def test_private_capture_is_marked_and_uses_private_directory(wincreator, ledger
     attestation, path, _code = prove(wincreator, ledger, tmp_path, private=True)
     assert attestation["payload"]["policy"]["private"] is True
     assert "private" in str(path)
+
+
+def test_regulated_capture_fails_closed_when_git_status_errors(
+    wincreator, ledger, clean_git_repo, tmp_path, monkeypatch
+):
+    ledger_path = clean_git_repo / "PROOF_LEDGER.md"
+    ledger_path.write_text(ledger.read_text(encoding="utf-8"), encoding="utf-8")
+    subprocess.run(["git", "add", "PROOF_LEDGER.md"], cwd=clean_git_repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "ledger"], cwd=clean_git_repo, check=True)
+    original_git = wincreator._git
+
+    def fail_status(cwd, *args):
+        if args[:2] == ("status", "--porcelain=v1"):
+            return None
+        return original_git(cwd, *args)
+
+    monkeypatch.setattr(wincreator, "_git", fail_status)
+    marker = clean_git_repo / "gate-ran"
+    with pytest.raises(ValueError, match="clean Git tree"):
+        wincreator.run_and_attest(
+            "P1",
+            [sys.executable, "-c", f"open({str(marker)!r}, 'w').write('ran')"],
+            ledger=str(ledger_path),
+            attest_dir=str(tmp_path / "attestations"),
+            cwd=str(clean_git_repo),
+            quiet=True,
+            tier="regulated",
+            builder="builder-01",
+        )
+    assert not marker.exists()
+
+
+def test_regulated_capture_rejects_gate_that_changes_git_state(
+    wincreator, ledger, clean_git_repo, tmp_path
+):
+    ledger_path = clean_git_repo / "PROOF_LEDGER.md"
+    ledger_path.write_text(ledger.read_text(encoding="utf-8"), encoding="utf-8")
+    subprocess.run(["git", "add", "PROOF_LEDGER.md"], cwd=clean_git_repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "ledger"], cwd=clean_git_repo, check=True)
+
+    attestation, _path, code = wincreator.run_and_attest(
+        "P1",
+        [sys.executable, "-c", "open('seed.txt', 'w').write('changed\\n')"],
+        ledger=str(ledger_path),
+        attest_dir=str(tmp_path / "attestations"),
+        cwd=str(clean_git_repo),
+        quiet=True,
+        tier="regulated",
+        builder="builder-01",
+    )
+
+    assert code == 2
+    assert attestation["payload"]["capture"]["status"] == "CAPTURE_ERROR"
+    assert "changed Git state" in attestation["payload"]["capture"]["error"]

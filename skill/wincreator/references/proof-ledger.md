@@ -19,9 +19,10 @@ One markdown table. Columns are fixed. One row per claim.
 | P3 | Micro | perf ≥ target on large files | benchmark on real corpus | WAIVED | user 2026-07-10: "ship without the benchmark, we'll measure next sprint" |
 ```
 
-## Status semantics (exactly seven since v3)
+## Status semantics (exactly eight since v3)
 
-Two statuses block a loop from reporting done: `CLAIMED` and `DISPROVEN`.
+Three statuses block a loop from reporting done: `CLAIMED`, `DISPROVEN`, and
+`INSUFFICIENT`.
 
 - `CLAIMED` — asserted, no evidence yet. A working state only. **No loop may
   report "done" while a CLAIMED row remains.**

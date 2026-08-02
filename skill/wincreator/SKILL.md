@@ -51,7 +51,7 @@ stakes turn out higher, never silently.
 |---|---|---|
 | **Lite** (default) | one claim, one gate, result checkable right now | announce and execute the gate; use `--tier lite --auto-approve-lite` only when a separate review would add no value. |
 | **Standard** | multi-step work whose failure would be expensive or silent | Loop Panel + ledger + captured gate + a separate `review` on critical claims + `ledger_check.py`. |
-| **Regulated** | audited, contractual, safety- or compliance-relevant work | Standard + clean Git tree, strict Builder/reviewer separation, captured attestations, retained artifacts and human sign-off. |
+| **Regulated** | audited, contractual, safety- or compliance-relevant work | Standard + Git state unchanged before/after the gate, distinct Builder/reviewer identifiers, captured attestations, retained artifacts, and human sign-off enforced by the surrounding review process. Mark CI reviews `--automatic`; they are not human approval. |
 
 If you cannot name why the task needs Standard, it is a Lite task.
 
@@ -195,8 +195,10 @@ Review may record `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. `INSUFFICIENT`
 is a first-class blocking ledger status; it cannot be mistaken for an ordinary
 waiting state.
 `CAPTURED_FAIL` can never become `EVIDENCED`; in Regulated mode the Builder
-cannot review their own capture. The capture binds the exact ID, level, claim
-text and gate, so changing any of them invalidates `verify`.
+cannot review their own capture. Pass `--automatic` for CI/tool review and
+obtain authenticated human sign-off outside the CLI when policy requires it.
+The capture binds the exact ID, level, claim text and gate, so changing any of
+them invalidates `verify`.
 
 Use `--file` only for mandatory artifacts; a missing file aborts before the
 gate. Use `--optional-file` for optional inputs. Protect sensitive output with

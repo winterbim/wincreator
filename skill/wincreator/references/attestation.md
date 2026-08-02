@@ -27,6 +27,9 @@ records the capture digest, reviewer, timestamp, verdict, and a separate
 canonical digest. Regulated mode rejects a reviewer whose identifier equals
 the Builder identifier. `INSUFFICIENT` is written to the ledger as a distinct,
 blocking status; it is never collapsed into the non-blocking `PENDING` state.
+CI and tool-driven reviews must pass `--automatic`, which records
+`automatic: true`; that marker is not a substitute for authenticated human
+approval in the surrounding PR or compliance process.
 
 ## Canonical capture schema
 
@@ -127,10 +130,12 @@ aliases `ended_at`, `alg`, or `node`.
 
 Git context includes the commit, tree, branch, dirty state, remote, recursive
 submodule status, and a digest of untracked paths/content. Regulated capture
-requires an available, clean Git tree before the command runs.
+fails closed unless Git inspection succeeds and the complete Git context is
+unchanged before and after the command runs.
 
-`--file` is mandatory: a missing file stops before the gate. Use
-`--optional-file` only when absence is allowed and must be recorded.
+A path declared with `--file` is mandatory: if it is missing, capture stops
+before the gate. Use `--optional-file` only when absence is allowed and must
+be recorded.
 
 Run directories use microseconds plus a UUID and are created exclusively, so
 concurrent captures for one claim do not collide.

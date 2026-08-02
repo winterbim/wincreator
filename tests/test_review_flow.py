@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import sys
 
 import pytest
@@ -68,3 +69,23 @@ def test_insufficient_review_blocks_completion(wincreator, ledger_check, ledger,
     _checked, problems = wincreator.verify_ledger_references(str(ledger))
     assert any("not evidenced" in problem for problem in problems)
     assert ledger_check.check(str(ledger)) == 1
+
+
+def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    code = wincreator.main([
+        "review",
+        "P1",
+        "--attestation",
+        str(path),
+        "--ledger",
+        str(ledger),
+        "--verdict",
+        "evidenced",
+        "--reviewer",
+        "ci-skeptic",
+        "--automatic",
+    ])
+    review = json.loads((Path(path).parent / "review.json").read_text(encoding="utf-8"))
+    assert code == 0
+    assert review["payload"]["automatic"] is True

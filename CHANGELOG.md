@@ -19,7 +19,7 @@ the result is `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`.
 - `wincreator.py prove/review/verify`: exact claim/gate binding, review
   attestations, signing-key isolation, clean-tree Regulated policy, atomic
   ledger updates, duplicate rejection, collision-safe captures, redaction,
-  output limits, private mode, and mandatory evidence files.
+  output limits, private mode, and fail-closed declared evidence files.
 - `schemas/attestation-v1.schema.json`, external pytest suite, and safe v2→v3
   migration tool.
 - Deterministic `skill.zip` plus byte-identical `wincreator.skill`.

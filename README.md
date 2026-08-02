@@ -72,10 +72,12 @@ python3 skill/wincreator/scripts/wincreator.py verify \
 ```
 
 Lite work may opt into `--tier lite --auto-approve-lite`. Standard and
-Regulated work require a real review. In Regulated mode the working tree must
-be clean and the reviewer must differ from the Builder. Standard captures
-outside Git should pass source inputs with `--file`; otherwise the CLI warns
-that no source snapshot is claim-bound.
+Regulated work require a separate review. In Regulated mode the Git state must
+remain unchanged through the gate and the reviewer identifier must differ from
+the Builder. The CLI records `--automatic` reviews explicitly; authenticated
+human independence and approval must be enforced by the surrounding PR or
+compliance process. Standard captures outside Git should pass source inputs
+with `--file`; otherwise the CLI warns that no source snapshot is claim-bound.
 
 ## Sensitive data
 
