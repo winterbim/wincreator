@@ -11,10 +11,6 @@ description: >-
   work", "organise cette boucle". Not for trivial edits, exploration,
   explanations, or routine multi-step coding where a quick check suffices —
   use the Lite tier or no ceremony at all. Domain-agnostic; assumes no stack.
-license: MIT
-metadata:
-  version: 3.0.0
-  repository: https://github.com/winterbim/wincreator
 ---
 
 # WinCreator — Hierarchical Engineering Loops with Proof Gates
@@ -53,9 +49,9 @@ stakes turn out higher, never silently.
 
 | Tier | Use when | What you actually do |
 |---|---|---|
-| **Lite** (default) | one claim, one gate, result checkable right now | announce the gate, execute it, quote the raw result. No ledger file, no panel. |
-| **Standard** | multi-step work whose failure would be expensive or silent | Loop Panel + `PROOF_LEDGER.md` + a Skeptic pass on the critical claims + `ledger_check.py` before reporting done. |
-| **Regulated** | audited, contractual, safety- or compliance-relevant work | Standard + strict Builder/Skeptic separation, every claim proven with `wincreator prove` (captured attestations), `ledger_check.py --strict-attestation`, retained artifacts, human sign-off. |
+| **Lite** (default) | one claim, one gate, result checkable right now | announce and execute the gate; use `--tier lite --auto-approve-lite` only when a separate review would add no value. |
+| **Standard** | multi-step work whose failure would be expensive or silent | Loop Panel + ledger + captured gate + a separate `review` on critical claims + `ledger_check.py`. |
+| **Regulated** | audited, contractual, safety- or compliance-relevant work | Standard + clean Git tree, strict Builder/reviewer separation, captured attestations, retained artifacts and human sign-off. |
 
 If you cannot name why the task needs Standard, it is a Lite task.
 
@@ -158,6 +154,7 @@ exactly one status:
 | `CLAIMED` | Asserted, no evidence yet. Must not survive to the end of a loop. |
 | `EVIDENCED` | Linked to a proof actually executed and inspected (command + raw result reference). |
 | `DISPROVEN` | The gate ran and the claim is **false**. A retained negative result; blocks "done" exactly like CLAIMED. |
+| `INSUFFICIENT` | Independent review found that the capture does not prove the claim. Blocks "done" until new evidence is captured and reviewed. |
 | `PENDING` | Proof defined but not executable in this context. Honest waiting state. |
 | `BLOCKED` | The gate cannot run because of a *named*, dated external dependency. |
 | `WAIVED` | The user explicitly accepted proceeding without proof. Recorded debt, never silent. |
@@ -167,27 +164,48 @@ A falsified claim is evidence too: never delete a `DISPROVEN` row and never
 downgrade it to `PENDING`. Fix the thing and re-prove it, or reformulate the
 claim in a new row and mark the old one `SUPERSEDED`.
 
-`scripts/ledger_check.py` (stdlib-only) exits non-zero if any CLAIMED or
-DISPROVEN row remains, or if a row's evidence does not carry what its status
-requires. Run it as the final mechanical gate of every Meso loop, and in CI if
-the project has one. Full spec: `references/proof-ledger.md`.
+`scripts/ledger_check.py` (stdlib-only) exits non-zero if any CLAIMED,
+DISPROVEN, or INSUFFICIENT row remains, or if a row's evidence does not carry
+what its status requires. Run it as the final mechanical gate of every Meso
+loop, and in CI if the project has one. Full spec:
+`references/proof-ledger.md`.
 
-## Capture the proof, do not narrate it
+## Capture first, review second
 
-A hand-written Evidence cell is still a story about a proof. When an execution
-tool is available, let the tooling write the row:
+A hand-written Evidence cell is still a story about a proof. Execute the gate
+through the capture layer:
 
 ```
-python3 scripts/wincreator.py prove P-014 -- pytest tests/test_export.py -q
+python3 scripts/wincreator.py prove P-014 \
+  --tier standard --builder builder-01 \
+  -- pytest tests/test_export.py -q
 ```
 
-It captures stdout/stderr and their sha256, the exit code, the duration, the
-current commit (and whether the tree was dirty), hashes any `--file`
-artifact, writes a signable JSON attestation under `.wincreator/attestations/`,
-and only then updates the row — `EVIDENCED` when the command exits 0,
-`DISPROVEN` when it does not. It cannot write a passing status for a failing
-command; that is the whole point. `wincreator.py verify` re-hashes every
-attestation and artifact, so a row edited afterwards is detectable.
+Capture produces `CAPTURED_PASS`, `CAPTURED_FAIL`, or `CAPTURE_ERROR`. A pass
+remains `PENDING` in Standard/Regulated because exit 0 proves only that the
+command succeeded, not that the command proves the claim. Review the exact
+capture separately:
+
+```
+python3 scripts/wincreator.py review P-014 \
+  --verdict evidenced --reviewer skeptic-01
+```
+
+Review may record `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. `INSUFFICIENT`
+is a first-class blocking ledger status; it cannot be mistaken for an ordinary
+waiting state.
+`CAPTURED_FAIL` can never become `EVIDENCED`; in Regulated mode the Builder
+cannot review their own capture. The capture binds the exact ID, level, claim
+text and gate, so changing any of them invalidates `verify`.
+
+Use `--file` only for mandatory artifacts; a missing file aborts before the
+gate. Use `--optional-file` for optional inputs. Protect sensitive output with
+`--redact`, `--redact-regex`, `--max-output-bytes`, `--no-output-body`, or
+`--private`. The signing key is removed from the gate environment and applied
+only after the process exits. A Standard capture outside Git warns when it has
+no `--file`, because then no source snapshot is bound to the claim. Read
+`references/attestation.md` and validate the machine schema at
+`schemas/attestation-v1.schema.json` for Regulated work.
 
 ## Builder/Skeptic separation (defense against optimism leak)
 
@@ -291,12 +309,13 @@ evolution, and now the gate can say so.
 1. Classify: level + weight, stated in one line.
 2. Announce the truth gate before starting. Open the Loop Panel (Meso+).
 3. Build (Builder role). Ledger rows enter as CLAIMED.
-4. Verify (Skeptic role — subagent if available, labeled adversarial pass
-   otherwise). Skeptic writes the status.
+4. Capture the gate with `wincreator prove`, then review the capture from the
+   Skeptic role with `wincreator review`. Only review writes `EVIDENCED` in
+   Standard/Regulated.
 5. Report the raw proof result, never an optimistic summary. Re-emit the
    Panel.
 6. Gate failed once → iterate. Failed twice → Two-Failure level audit.
-7. Gate passed → report up explicitly with what was proven.
+7. Gate captured pass + review EVIDENCED → report up explicitly with what was proven.
 8. Proof not executable → PENDING, never assumed.
 9. End of Meso loop: `python3 scripts/ledger_check.py` as the final
    mechanical gate (`--self-test` first if the script is newly installed;

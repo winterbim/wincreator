@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/winterbim/wincreator/schemas/attestation-v1.schema.json",
+  "title": "WinCreator attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "payload", "digest"],
+  "properties": {
+    "schema": {"const": "wincreator.attestation/v1"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_version", "claim", "ledger", "builder", "command", "command_string",
+        "capture", "started_at", "finished_at", "duration_ms", "stdout", "stderr",
+        "files", "git", "environment", "policy"
+      ],
+      "properties": {
+        "tool_version": {"type": "string"},
+        "claim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "level", "text", "gate", "row_sha256", "ledger_sha256_before", "status_before"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "level": {"type": "string"},
+            "text": {"type": "string"},
+            "gate": {"type": "string"},
+            "row_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+            "ledger_sha256_before": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+            "status_before": {"type": ["string", "null"]}
+          }
+        },
+        "ledger": {"type": ["string", "null"]},
+        "builder": {"type": "string", "minLength": 1},
+        "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "command_string": {"type": "string"},
+        "capture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "exit_code", "error"],
+          "properties": {
+            "status": {"enum": ["CAPTURED_PASS", "CAPTURED_FAIL", "CAPTURE_ERROR"]},
+            "exit_code": {"type": ["integer", "null"]},
+            "error": {"type": ["string", "null"]}
+          }
+        },
+        "started_at": {"type": "string"},
+        "finished_at": {"type": "string"},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "stdout": {"$ref": "#/$defs/stream"},
+        "stderr": {"$ref": "#/$defs/stream"},
+        "files": {"type": "array", "items": {"$ref": "#/$defs/file"}},
+        "git": {"type": "object"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "python", "hostname", "cwd", "ci", "user"],
+          "properties": {
+            "platform": {"type": "string"}, "python": {"type": "string"},
+            "hostname": {"type": "string"}, "cwd": {"type": "string"},
+            "ci": {"type": "string"}, "user": {"type": "string"}
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "dirty_override", "private", "redaction_literals", "redaction_regexes", "max_output_bytes", "no_output_body"],
+          "properties": {
+            "tier": {"enum": ["lite", "standard", "regulated"]},
+            "dirty_override": {"type": "boolean"}, "private": {"type": "boolean"},
+            "redaction_literals": {"type": "integer", "minimum": 0},
+            "redaction_regexes": {"type": "integer", "minimum": 0},
+            "max_output_bytes": {"type": "integer", "minimum": 0},
+            "no_output_body": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "digest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "value"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "canonicalization": {"const": "json/sorted-compact/utf-8"},
+        "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": {"const": "hmac-sha256"},
+        "key_id": {"type": "string", "pattern": "^[0-9a-f]{12}$"},
+        "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "stream": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "original_bytes", "stored_bytes", "truncated", "body_stored", "tail"],
+      "properties": {
+        "path": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "original_bytes": {"type": "integer", "minimum": 0}, "stored_bytes": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}, "body_stored": {"type": "boolean"}, "tail": {"type": "string"}
+      }
+    },
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "optional", "missing"],
+      "properties": {
+        "path": {"type": "string"}, "optional": {"type": "boolean"}, "missing": {"type": "boolean"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

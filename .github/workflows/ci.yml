@@ -1,0 +1,147 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest==8.3.5 jsonschema==4.23.0
+      - name: Compile shipped Python
+        run: python -m compileall -q skill/wincreator/scripts tools tests
+      - name: Run embedded adversarial suites
+        run: |
+          python skill/wincreator/scripts/ledger_check.py --self-test
+          python skill/wincreator/scripts/wincreator.py --self-test
+          python skill/wincreator/scripts/package_check.py --self-test
+      - name: Run external adversarial suite
+        run: python -m pytest -q
+      - name: Check package policy
+        run: python skill/wincreator/scripts/package_check.py skill/wincreator
+      - name: Check historical ledgers
+        run: |
+          python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
+          python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v2-install.md
+          python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-evolution.md
+          python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v3-proof-capture.md
+      - name: Build package on this platform
+        run: python tools/build_package.py --source skill/wincreator dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wincreator-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            dist/skill.zip
+            dist/skill.zip.sha256
+            dist/wincreator.skill
+            dist/wincreator.skill.sha256
+          if-no-files-found: error
+
+  official-skill-validation:
+    name: official-skill-validation
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_SKILLS_REF: 49f948faa9258a0c61caceaf225e179651397431
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fetch pinned OpenAI Skill Creator
+        run: |
+          git init "$RUNNER_TEMP/openai-skills"
+          git -C "$RUNNER_TEMP/openai-skills" remote add origin https://github.com/openai/skills.git
+          git -C "$RUNNER_TEMP/openai-skills" fetch --depth 1 origin "$OPENAI_SKILLS_REF"
+          git -C "$RUNNER_TEMP/openai-skills" checkout --detach FETCH_HEAD
+      - name: Validate with OpenAI Skill Creator
+        run: python "$RUNNER_TEMP/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py" skill/wincreator
+      - name: Validate against the Agent Skills reference implementation
+        run: npx --yes skills-ref@0.1.5 validate skill/wincreator
+      - name: Prove reproducible package
+        run: |
+          python tools/build_package.py --source skill/wincreator dist/build-1
+          python tools/build_package.py --source skill/wincreator dist/build-2
+          python -c "from pathlib import Path; a=Path('dist/build-1/skill.zip').read_bytes(); b=Path('dist/build-2/skill.zip').read_bytes(); c=Path('dist/build-1/wincreator.skill').read_bytes(); assert a == b == c"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wincreator-official-package
+          path: |
+            dist/build-1/skill.zip
+            dist/build-1/skill.zip.sha256
+            dist/build-1/wincreator.skill
+            dist/build-1/wincreator.skill.sha256
+          if-no-files-found: error
+
+  release-attestation:
+    name: release-attestation
+    needs: [test, official-skill-validation]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install release-gate dependencies
+        run: python -m pip install --disable-pip-version-check pytest==8.3.5 jsonschema==4.23.0
+      - name: Require a clean checkout
+        run: test -z "$(git status --porcelain)"
+      - name: Capture and review the source release gate
+        run: |
+          cp PROOF_LEDGER-v3-proof-capture.md "$RUNNER_TEMP/release-ledger.md"
+          python skill/wincreator/scripts/wincreator.py prove V3-07 \
+            --ledger "$RUNNER_TEMP/release-ledger.md" \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --tier regulated \
+            --builder github-actions-builder \
+            -- python tools/run_release_gate.py
+          python skill/wincreator/scripts/wincreator.py review V3-07 \
+            --ledger "$RUNNER_TEMP/release-ledger.md" \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --verdict evidenced \
+            --reviewer github-actions-skeptic
+          python skill/wincreator/scripts/wincreator.py verify \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --ledger "$RUNNER_TEMP/release-ledger.md"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wincreator-release-attestation-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/attestations
+            ${{ runner.temp }}/release-ledger.md
+          if-no-files-found: error
+
+  ci-success:
+    name: ci-success
+    if: always()
+    needs: [test, official-skill-validation, release-attestation]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI job
+        run: |
+          test '${{ needs.test.result }}' = success
+          test '${{ needs.official-skill-validation.result }}' = success
+          test '${{ needs.release-attestation.result }}' = success

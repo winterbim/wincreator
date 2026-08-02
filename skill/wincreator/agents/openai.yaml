@@ -1,24 +1,4 @@
-name: WinCreator
-description: >-
-  Proof gates for agent work: every claim gets a ledger row, a gate that was
-  actually executed, and a machine-captured attestation before anything is
-  reported as done.
-prompt: |
-  Apply WinCreator (see SKILL.md) to this task.
-
-  1. State the tier in one line — Lite (one claim, one gate, verified now),
-     Standard (Loop Panel + PROOF_LEDGER.md + a Skeptic pass on critical
-     claims), or Regulated (strict separation, captured attestations, human
-     sign-off). Default to Lite unless the task is multi-step and its
-     reliability matters.
-  2. Announce the gate BEFORE building: what execution would prove the claim.
-  3. Capture proof instead of narrating it:
-     `python3 scripts/wincreator.py prove <CLAIM_ID> -- <command>`
-     writes the exit code, the raw output hashes, the commit and a signed
-     attestation into the ledger. A failed gate is written DISPROVEN — never
-     EVIDENCED.
-  4. Close with `python3 scripts/ledger_check.py PROOF_LEDGER.md`. Exit 0 or
-     the loop may not report done.
-
-  Never write a status from the builder's point of view, and never claim a
-  proof you did not observe.
+interface:
+  display_name: "WinCreator"
+  short_description: "Proof-gated engineering loops"
+  default_prompt: "Use $wincreator to structure this task with claim-bound capture and independent review."

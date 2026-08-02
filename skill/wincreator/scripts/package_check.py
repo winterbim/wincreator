@@ -1,186 +1,170 @@
 #!/usr/bin/env python3
-"""package_check.py — is this directory a valid Agent Skill package?
+"""Validate WinCreator's repository package policy without external modules.
 
-The open Agent Skills format (Claude Code, Codex, Cursor and others) is
-opinionated about a few things that are easy to get silently wrong: the skill
-name must be lowercase-hyphenated AND match its parent directory, the
-frontmatter must carry a description, and every path the SKILL.md points at
-must exist. WinCreator shipped for months with `name: skill-wincreator` inside
-a directory called `Skill_WinCreator` — a packaging claim nobody had gated.
-
-Stdlib only (a deliberately minimal frontmatter reader, not a YAML parser).
-
-    python3 package_check.py [PACKAGE_DIR]     (default: the parent of scripts/)
-    python3 package_check.py --self-test
-
-Exit codes: 0 valid | 1 problems found | 2 unreadable / self-test failed
+This is an internal policy gate, not a claim of official runtime validation.
+Run OpenAI Skill Creator's quick_validate.py and `npx skills-ref validate`
+separately for official format validation.
 """
+
 import os
 import re
 import sys
 import tempfile
 
+
 VERSION = "3.0.0"
-NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 MAX_NAME = 64
 MAX_DESCRIPTION = 1024
-MAX_SKILL_CHARS = 16000  # keeps SKILL.md cheap to always-load
-LINK_RE = re.compile(r"(?:\]\(|`)((?:references|scripts|assets|agents)/[\w./-]+)")
-REQUIRED_OPENAI_KEYS = ("name", "description", "prompt")
+MAX_SKILL_CHARS = 24000
+ALLOWED_FRONTMATTER = {"name", "description"}
+LINK_RE = re.compile(r"(?:\]\(|`)((?:references|scripts|assets|agents|schemas)/[\w./-]+)")
+OPENAI_REQUIRED = {"display_name", "short_description", "default_prompt"}
+OPENAI_OPTIONAL = {"icon_small", "icon_large", "brand_color"}
 
 
 def read_frontmatter(text):
-    """Return (frontmatter_dict, body). Top-level scalar keys only — enough to
-    validate the fields the format requires, without pulling in a YAML dep."""
-    if not text.startswith("---"):
+    if not text.startswith("---\n"):
         return {}, text
-    end = text.find("\n---", 3)
-    if end == -1:
+    end = text.find("\n---\n", 4)
+    if end < 0:
         return {}, text
-    raw = text[3:end]
-    body = text[end + 4:]
-    data, key = {}, None
+    raw = text[4:end]
+    body = text[end + 5 :]
+    data = {}
+    active = None
     for line in raw.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        match = re.match(r"^(\w[\w.-]*):\s*(.*)$", line)
+        match = re.match(r"^([A-Za-z_][\w.-]*):\s*(.*)$", line)
         if match and not line.startswith((" ", "\t")):
-            key, value = match.group(1), match.group(2).strip()
-            data[key] = "" if value in (">-", "|", ">", "|-") else value.strip("\"'")
-        elif key and line.startswith((" ", "\t")):
-            data[key] = (data.get(key, "") + " " + line.strip()).strip()
+            active, value = match.groups()
+            data[active] = "" if value.strip() in {">", ">-", "|", "|-"} else value.strip().strip("\"'")
+        elif active and line.startswith((" ", "\t")):
+            data[active] = (data[active] + " " + line.strip()).strip()
+        else:
+            data["__invalid__"] = line
     return data, body
 
 
-def check_package(pkg_dir):
+def check_openai_yaml(text, skill_name):
     problems = []
-    pkg_dir = os.path.abspath(pkg_dir.rstrip("/"))
-    dir_name = os.path.basename(pkg_dir)
-    skill_path = os.path.join(pkg_dir, "SKILL.md")
-    if not os.path.isfile(skill_path):
-        return [f"{pkg_dir}: no SKILL.md — not a skill package"]
-    with open(skill_path, encoding="utf-8") as f:
-        text = f.read()
-    front, _body = read_frontmatter(text)
-
-    name = front.get("name", "")
-    if not name:
-        problems.append("SKILL.md frontmatter has no `name`")
-    else:
-        if not NAME_RE.match(name):
-            problems.append(f"name '{name}' is not lowercase-hyphenated "
-                            f"(Agent Skills requires [a-z0-9] and '-')")
-        if len(name) > MAX_NAME:
-            problems.append(f"name is {len(name)} chars (max {MAX_NAME})")
-        if name != dir_name:
-            problems.append(f"name '{name}' != directory '{dir_name}' — the package "
-                            f"directory must be named after the skill")
-
-    description = front.get("description", "")
-    if not description:
-        problems.append("SKILL.md frontmatter has no `description` (it is what an "
-                        "agent reads to decide whether to load the skill)")
-    elif len(description) > MAX_DESCRIPTION:
-        problems.append(f"description is {len(description)} chars (max {MAX_DESCRIPTION})")
-
-    if len(text) > MAX_SKILL_CHARS:
-        problems.append(f"SKILL.md is {len(text)} chars (budget {MAX_SKILL_CHARS})")
-
-    for rel in sorted(set(LINK_RE.findall(text))):
-        if not os.path.exists(os.path.join(pkg_dir, rel)):
-            problems.append(f"SKILL.md points at a missing path: {rel}")
-
-    openai_path = os.path.join(pkg_dir, "agents", "openai.yaml")
-    if not os.path.isfile(openai_path):
-        problems.append("agents/openai.yaml missing (recommended by OpenAI for the "
-                        "display name, short description and start prompt)")
-    else:
-        with open(openai_path, encoding="utf-8") as f:
-            openai_text = f.read()
-        for key in REQUIRED_OPENAI_KEYS:
-            if not re.search(rf"^{key}:", openai_text, re.MULTILINE):
-                problems.append(f"agents/openai.yaml has no `{key}:` key")
+    if "\t" in text:
+        problems.append("agents/openai.yaml contains tabs; YAML indentation must use spaces")
+    if re.search(r"^(name|description|prompt):", text, re.MULTILINE):
+        problems.append("agents/openai.yaml uses the obsolete name/description/prompt schema")
+    lines = [line for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    if not lines or lines[0] != "interface:":
+        problems.append("agents/openai.yaml must start with the current `interface:` mapping")
+        return problems
+    fields = {}
+    for line in lines[1:]:
+        match = re.fullmatch(r'  ([a-z_]+):\s+"([^"\\]*(?:\\.[^"\\]*)*)"', line)
+        if not match:
+            problems.append(f"agents/openai.yaml has invalid or unquoted field: {line}")
+            continue
+        key, value = match.groups()
+        if key in fields:
+            problems.append(f"agents/openai.yaml duplicates `{key}`")
+        fields[key] = value
+    missing = sorted(OPENAI_REQUIRED - set(fields))
+    if missing:
+        problems.append("agents/openai.yaml missing required interface field(s): " + ", ".join(missing))
+    unknown = sorted(set(fields) - OPENAI_REQUIRED - OPENAI_OPTIONAL)
+    if unknown:
+        problems.append("agents/openai.yaml has unsupported interface field(s): " + ", ".join(unknown))
+    short = fields.get("short_description", "")
+    if short and not 25 <= len(short) <= 64:
+        problems.append("interface.short_description must contain 25–64 characters")
+    prompt = fields.get("default_prompt", "")
+    if prompt and f"${skill_name}" not in prompt:
+        problems.append(f"interface.default_prompt must explicitly mention `${skill_name}`")
     return problems
 
 
-def report(pkg_dir):
+def check_package(package_dir):
+    package_dir = os.path.abspath(package_dir.rstrip("/\\"))
+    problems = []
+    skill_path = os.path.join(package_dir, "SKILL.md")
+    if not os.path.isfile(skill_path):
+        return [f"{package_dir}: no SKILL.md"]
+    text = open(skill_path, encoding="utf-8").read()
+    frontmatter, _body = read_frontmatter(text)
+    unknown = sorted(set(frontmatter) - ALLOWED_FRONTMATTER)
+    if unknown:
+        problems.append("SKILL.md frontmatter has unsupported field(s): " + ", ".join(unknown))
+    name = frontmatter.get("name", "")
+    if not name:
+        problems.append("SKILL.md frontmatter has no `name`")
+    elif not NAME_RE.fullmatch(name) or len(name) > MAX_NAME:
+        problems.append("SKILL.md name must be lowercase hyphen-case and at most 64 characters")
+    elif name != os.path.basename(package_dir):
+        problems.append(f"name '{name}' does not match directory '{os.path.basename(package_dir)}'")
+    description = frontmatter.get("description", "")
+    if not description or len(description) > MAX_DESCRIPTION:
+        problems.append("SKILL.md description is missing or exceeds 1024 characters")
+    if len(text) > MAX_SKILL_CHARS:
+        problems.append(f"SKILL.md is {len(text)} characters (policy limit {MAX_SKILL_CHARS})")
+    for relative in sorted(set(LINK_RE.findall(text))):
+        if not os.path.exists(os.path.join(package_dir, relative)):
+            problems.append(f"SKILL.md points at a missing path: {relative}")
+    openai_path = os.path.join(package_dir, "agents", "openai.yaml")
+    if not os.path.isfile(openai_path):
+        problems.append("agents/openai.yaml missing")
+    else:
+        openai_text = open(openai_path, encoding="utf-8").read()
+        problems.extend(check_openai_yaml(openai_text, name))
+    return problems
+
+
+def report(package_dir):
     try:
-        problems = check_package(pkg_dir)
-    except OSError as e:
-        print(f"ERROR: {e}")
+        problems = check_package(package_dir)
+    except OSError as error:
+        print(f"ERROR: {error}")
         return 2
     if problems:
-        print(f"PACKAGE INVALID — {len(problems)} problem(s) in {pkg_dir}:")
-        for p in problems:
-            print(f"  ✗ {p}")
+        print(f"WINCREATOR PACKAGE POLICY: FAIL — {len(problems)} problem(s)")
+        for problem in problems:
+            print(f"  - {problem}")
         return 1
-    print(f"PACKAGE VALID — {pkg_dir} matches the Agent Skills conventions")
+    print(f"WINCREATOR PACKAGE POLICY: PASS — {package_dir}")
     return 0
 
 
-# ---------------------------------------------------------------- self-test
-GOOD_SKILL = """---
-name: {name}
-description: >-
-  A description long enough to be meaningful for skill selection.
-metadata:
-  version: 1.0.0
----
-
-# Demo
-
-See `references/x.md` and [the script](scripts/y.py).
-"""
-
-GOOD_OPENAI = "name: demo\ndescription: short\nprompt: |\n  do the thing\n"
-
-
-def _make_pkg(root, dir_name, name, openai=GOOD_OPENAI, extra_files=True):
-    pkg = os.path.join(root, dir_name)
-    os.makedirs(os.path.join(pkg, "agents"), exist_ok=True)
-    with open(os.path.join(pkg, "SKILL.md"), "w", encoding="utf-8") as f:
-        f.write(GOOD_SKILL.format(name=name))
-    if extra_files:
-        for rel in ("references/x.md", "scripts/y.py"):
-            path = os.path.join(pkg, rel)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            open(path, "w").close()
-    if openai is not None:
-        with open(os.path.join(pkg, "agents", "openai.yaml"), "w", encoding="utf-8") as f:
-            f.write(openai)
-    return pkg
-
-
 def self_test():
-    cases = []
-    with tempfile.TemporaryDirectory() as root:
-        cases.append(("valid_package_passes",
-                      _make_pkg(root, "demo", "demo"), False))
-        cases.append(("name_directory_mismatch_caught",
-                      _make_pkg(root, "Demo_Skill", "demo-skill"), True))
-        cases.append(("uppercase_name_caught",
-                      _make_pkg(root, "Demo2", "Demo2"), True))
-        cases.append(("missing_openai_yaml_caught",
-                      _make_pkg(root, "demo3", "demo3", openai=None), True))
-        cases.append(("incomplete_openai_yaml_caught",
-                      _make_pkg(root, "demo4", "demo4",
-                                openai="name: demo\ndescription: short\n"), True))
-        cases.append(("broken_reference_caught",
-                      _make_pkg(root, "demo5", "demo5", extra_files=False), True))
-        failed = 0
-        for name, pkg, expect_problems in cases:
-            problems = check_package(pkg)
-            ok = bool(problems) == expect_problems
-            if not ok:
-                failed += 1
-            print(f"  [{'PASS' if ok else 'FAIL'}] {name}"
-                  f" (expected {'problems' if expect_problems else 'valid'},"
-                  f" got {len(problems)})")
-    print(f"self-test: {len(cases)-failed}/{len(cases)} passed")
-    return 2 if failed else 0
+    valid_skill = "---\nname: demo\ndescription: A useful demo skill for deterministic testing.\n---\n# Demo\n"
+    valid_openai = (
+        'interface:\n'
+        '  display_name: "Demo"\n'
+        '  short_description: "A deterministic demo skill"\n'
+        '  default_prompt: "Use $demo to run the demo."\n'
+    )
+    results = []
+    with tempfile.TemporaryDirectory() as directory:
+        package = os.path.join(directory, "demo")
+        os.makedirs(os.path.join(package, "agents"))
+        open(os.path.join(package, "SKILL.md"), "w", encoding="utf-8").write(valid_skill)
+        open(os.path.join(package, "agents", "openai.yaml"), "w", encoding="utf-8").write(valid_openai)
+        results.append(("valid_package", not check_package(package)))
+        open(os.path.join(package, "agents", "openai.yaml"), "w", encoding="utf-8").write(
+            "name: Demo\ndescription: old\nprompt: old\n"
+        )
+        results.append(("obsolete_openai_schema", any("obsolete" in item for item in check_package(package))))
+        open(os.path.join(package, "agents", "openai.yaml"), "w", encoding="utf-8").write(valid_openai)
+        open(os.path.join(package, "SKILL.md"), "w", encoding="utf-8").write(
+            valid_skill.replace("description:", "version: 3.0.0\ndescription:")
+        )
+        results.append(("extra_frontmatter", any("frontmatter" in item for item in check_package(package))))
+    for name, passed in results:
+        print(f"  [{'PASS' if passed else 'FAIL'}] {name}")
+    passed = sum(value for _name, value in results)
+    print(f"self-test: {passed}/{len(results)} passed")
+    return 0 if passed == len(results) else 2
 
 
-def main(argv):
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "--self-test":
         return self_test()
     if argv and argv[0] == "--version":
@@ -191,4 +175,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

@@ -1,6 +1,0 @@
-16:  version: 3.0.0
-skill/wincreator/CHANGELOG.md:7:## [3.0.0] — 2026-08-02
-CHANGELOG.md:13:## [3.0.0] — 2026-08-02
-skill/wincreator/scripts/ledger_check.py:58:VERSION = "3.0.0"
-skill/wincreator/scripts/package_check.py:23:VERSION = "3.0.0"
-skill/wincreator/scripts/wincreator.py:45:VERSION = "3.0.0"

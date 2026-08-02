@@ -1,658 +1,1237 @@
 #!/usr/bin/env python3
-"""wincreator.py — capture proof instead of narrating it.
+"""Capture, review, and verify evidence for WinCreator proof-ledger claims.
 
-`ledger_check.py` grades a *story* about a proof: it reads what a human (or an
-agent) typed into an Evidence cell. This tool removes the typing. It runs the
-gate itself, captures the raw result, binds it to the current commit, hashes
-everything, writes a signable attestation, and only then updates the ledger —
-refusing to write EVIDENCED when the command failed.
-
-Stdlib only, no network, no config.
-
-    python3 wincreator.py prove P-014 -- pytest tests/test_export.py -q
-    python3 wincreator.py verify                     # re-hash every attestation
-    python3 wincreator.py verify --ledger PROOF_LEDGER.md
-    python3 wincreator.py --self-test
-
-What `prove` captures, per run:
-    the exact argv, exit code, duration, UTC start/end, cwd, host platform and
-    python version, git commit + branch + dirty flag, sha256 of stdout, stderr
-    and of any --file passed, plus a canonical sha256 digest over all of it
-    (optionally HMAC-signed with $WINCREATOR_SIGNING_KEY).
-
-Exit codes:
-    prove   0 the gate passed (row written EVIDENCED)
-            1 the gate failed (row written DISPROVEN — a retained negative)
-            2 usage / ledger row not found / command not executable
-    verify  0 every attestation matches its artifacts
-            1 at least one mismatch (tampering or edited artifact)
-            2 nothing to verify / unreadable
+The capture result (CAPTURED_PASS, CAPTURED_FAIL, CAPTURE_ERROR) is mechanical.
+The epistemic verdict (EVIDENCED, INSUFFICIENT, DISPROVEN) is a separate review.
+All persisted evidence is bound to the exact claim ID, level, text, and gate.
 """
+
 import argparse
+from contextlib import contextmanager
+from datetime import datetime, timezone
+import getpass
 import hashlib
 import hmac
 import json
 import os
+from pathlib import Path
 import platform
 import re
-import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+import uuid
+
 
 VERSION = "3.0.0"
-SCHEMA = "wincreator.attestation/v1"
+ATTESTATION_SCHEMA = "wincreator.attestation/v1"
+REVIEW_SCHEMA = "wincreator.review/v1"
 DEFAULT_ATTEST_DIR = ".wincreator/attestations"
 DEFAULT_LEDGER = "PROOF_LEDGER.md"
 SIGNING_KEY_ENV = "WINCREATOR_SIGNING_KEY"
+DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024
 TAIL_CHARS = 2000
-
+LEDGER_HEADER = ("id", "level", "claim", "gate", "status", "evidence")
 SPLIT_UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
+FENCE = re.compile(r"^\s*(```|~~~)")
+ATTESTATION_REF = re.compile(
+    r"attestation\s+(?P<path>\S+?attestation\.json)\s+sha256=(?P<digest>[0-9a-f]{64})"
+)
+REVIEW_REF = re.compile(
+    r"review\s+(?P<path>\S+?review\.json)\s+sha256=(?P<digest>[0-9a-f]{64})"
+)
 
 
-# --------------------------------------------------------------- primitives
-def _utc_now():
+# ---------------------------------------------------------------- primitives
+def utc_now():
     return datetime.now(timezone.utc)
 
 
-def _iso(dt):
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+def iso_time(value):
+    return value.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
-def sha256_bytes(data: bytes) -> str:
+def portable_path(path):
+    """Use forward slashes in persisted paths, including Windows drive paths."""
+    return os.fspath(path).replace("\\", "/")
+
+
+def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def sha256_file(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
-def canonical_digest(payload: dict) -> str:
-    """sha256 over a canonical JSON serialization — stable across machines."""
-    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False).encode("utf-8")
-    return sha256_bytes(blob)
+def canonical_digest(payload):
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return sha256_bytes(encoded)
 
 
-def sign(digest: str):
-    """HMAC-SHA256 the digest with $WINCREATOR_SIGNING_KEY, if set.
-
-    Deliberately not public-key signing: a keyed MAC is stdlib-only and enough
-    to make a local attestation unforgeable by anyone without the key. A
-    Sigstore/in-toto backend is the documented next step, not a claim made here.
-    """
+def _signature(digest):
     key = os.environ.get(SIGNING_KEY_ENV)
     if not key:
         return None
     key_bytes = key.encode("utf-8")
     return {
-        "alg": "HMAC-SHA256",
-        "key_id": hashlib.sha256(key_bytes).hexdigest()[:12],
-        "value": hmac.new(key_bytes, digest.encode("utf-8"), hashlib.sha256).hexdigest(),
+        "algorithm": "hmac-sha256",
+        "key_id": sha256_bytes(key_bytes)[:12],
+        "value": hmac.new(key_bytes, digest.encode("ascii"), hashlib.sha256).hexdigest(),
     }
 
 
-def git_context(cwd: str) -> dict:
-    def _git(*args):
-        try:
-            out = subprocess.run(["git", *args], cwd=cwd, capture_output=True,
-                                 text=True, timeout=15)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return out.stdout.strip() if out.returncode == 0 else None
-
-    commit = _git("rev-parse", "HEAD")
-    if commit is None:
-        return {"available": False}
-    status = _git("status", "--porcelain")
-    return {
-        "available": True,
-        "commit": commit,
-        "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
-        "dirty": bool(status),
-        "remote": _git("config", "--get", "remote.origin.url"),
-    }
+def _check_signature(document, problems):
+    signature = document.get("signature")
+    if not signature:
+        return
+    recorded = document.get("digest", {}).get("value", "")
+    expected = _signature(recorded)
+    if expected is None:
+        problems.append(
+            f"signed with key_id {signature.get('key_id')} but ${SIGNING_KEY_ENV} "
+            "is not set"
+        )
+    elif not hmac.compare_digest(expected["value"], signature.get("value", "")):
+        problems.append("signature mismatch — wrong key or forged document")
 
 
-# ------------------------------------------------------------------- ledger
-def escape_cell(text: str) -> str:
-    """Make arbitrary captured text safe inside a markdown table cell."""
-    return text.replace("|", "\\|").replace("\r", " ").replace("\n", " ").strip()
+def _atomic_write(path, data, mode=None):
+    path = os.path.abspath(path)
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".wincreator-ledger-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if mode is not None:
+            os.chmod(temporary, mode)
+        os.replace(temporary, path)
+        if hasattr(os, "O_DIRECTORY"):
+            directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
-def find_row(lines, claim_id: str):
-    """Return (index, cells) of the ledger row whose ID cell == claim_id."""
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if not (stripped.startswith("|") and stripped.endswith("|")):
+def _atomic_json(path, document):
+    data = (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    _atomic_write(path, data, 0o600)
+
+
+@contextmanager
+def _file_lock(path):
+    lock_root = os.path.join(tempfile.gettempdir(), "wincreator-ledger-locks")
+    os.makedirs(lock_root, mode=0o700, exist_ok=True)
+    lock_name = sha256_bytes(os.path.abspath(path).encode("utf-8")) + ".lock"
+    lock_path = os.path.join(lock_root, lock_name)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        if os.name == "nt":  # pragma: no cover - executed by the Windows CI job
+            import msvcrt
+
+            os.lseek(fd, 0, os.SEEK_SET)
+            if os.fstat(fd).st_size == 0:
+                os.write(fd, b"0")
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        if os.name == "nt":  # pragma: no cover
+            import msvcrt
+
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+# -------------------------------------------------------------------- ledger
+def escape_cell(value):
+    return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ").strip()
+
+
+def _split_row(line):
+    stripped = line.strip()
+    if not (stripped.startswith("|") and stripped.endswith("|")):
+        return None
+    return [part.strip().replace("\\|", "|") for part in SPLIT_UNESCAPED_PIPE.split(stripped[1:-1])]
+
+
+def _is_separator(cells):
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells if cell)
+
+
+def _is_ledger_header(cells):
+    return len(cells) >= 6 and all(
+        cell.lower().startswith(expected)
+        for cell, expected in zip(cells[:6], LEDGER_HEADER)
+    )
+
+
+def _ledger_rows(lines):
+    in_fence = False
+    in_ledger = False
+    candidate_header = None
+    for index, line in enumerate(lines):
+        if FENCE.match(line):
+            in_fence = not in_fence
+            in_ledger = False
+            candidate_header = None
             continue
-        cells = SPLIT_UNESCAPED_PIPE.split(stripped[1:-1])
-        if len(cells) >= 6 and cells[0].strip() == claim_id:
-            return i, cells
-    return None, None
+        if in_fence:
+            continue
+        cells = _split_row(line)
+        if cells is None:
+            in_ledger = False
+            candidate_header = None
+            continue
+        if _is_separator(cells):
+            in_ledger = candidate_header is not None and _is_ledger_header(candidate_header)
+            candidate_header = None
+            continue
+        if in_ledger:
+            yield index, cells
+        else:
+            candidate_header = cells
 
 
-def update_ledger(ledger_path: str, claim_id: str, status: str, evidence: str):
-    """Rewrite the Status and Evidence cells of one row. Returns the old status."""
-    with open(ledger_path, encoding="utf-8") as f:
-        text = f.read()
+def claim_row_sha256(claim):
+    identity = {
+        "id": claim["id"],
+        "level": claim["level"],
+        "text": claim["text"],
+        "gate": claim["gate"],
+    }
+    return canonical_digest(identity)
+
+
+def _read_claim_from_text(text, claim_id):
     lines = text.splitlines(keepends=True)
-    idx, cells = find_row(lines, claim_id)
-    if idx is None:
+    matches = []
+    for index, cells in _ledger_rows(lines):
+        if len(cells) >= 6 and cells[0] == claim_id:
+            matches.append((index, cells))
+    if not matches:
         raise KeyError(claim_id)
-    old_status = cells[4].strip()
-    cells[4] = f" {status} "
-    cells[5] = f" {escape_cell(evidence)} "
-    newline = "\n" if lines[idx].endswith("\n") else ""
-    lines[idx] = "|" + "|".join(cells) + "|" + newline
-    with open(ledger_path, "w", encoding="utf-8") as f:
-        f.write("".join(lines))
+    if len(matches) > 1:
+        raise ValueError(f"duplicate claim identifier '{claim_id}' in ledger")
+    index, cells = matches[0]
+    claim = {
+        "id": cells[0],
+        "level": cells[1],
+        "text": cells[2],
+        "gate": cells[3],
+        "status": cells[4].strip("*_~` ").upper(),
+        "evidence": cells[5],
+        "line_index": index,
+    }
+    claim["row_sha256"] = claim_row_sha256(claim)
+    return claim, lines, cells
+
+
+def read_claim(ledger_path, claim_id):
+    text = Path(ledger_path).read_text(encoding="utf-8")
+    claim, _lines, _cells = _read_claim_from_text(text, claim_id)
+    return claim
+
+
+def update_ledger(ledger_path, claim_id, status, evidence, expected_row_sha=None):
+    with _file_lock(ledger_path):
+        text = Path(ledger_path).read_text(encoding="utf-8")
+        claim, lines, cells = _read_claim_from_text(text, claim_id)
+        if expected_row_sha and claim["row_sha256"] != expected_row_sha:
+            raise RuntimeError(
+                f"claim {claim_id} changed while its gate was running; ledger not updated"
+            )
+        old_status = claim["status"]
+        cells[4] = status
+        cells[5] = evidence
+        newline = "\n" if lines[claim["line_index"]].endswith("\n") else ""
+        lines[claim["line_index"]] = (
+            "| " + " | ".join(escape_cell(cell) for cell in cells) + " |" + newline
+        )
+        mode = os.stat(ledger_path).st_mode & 0o777
+        _atomic_write(ledger_path, "".join(lines).encode("utf-8"), mode)
     return old_status
 
 
-# -------------------------------------------------------------------- prove
-def run_and_attest(claim_id, command, ledger=None, files=(), attest_dir=DEFAULT_ATTEST_DIR,
-                   cwd=None, timeout=None, quiet=False):
-    """Execute `command`, capture everything, write the attestation.
-
-    Returns (attestation_dict, attestation_path, exit_code).
-    """
-    cwd = cwd or os.getcwd()
-    started = _utc_now()
-    t0 = time.monotonic()
+# ----------------------------------------------------------------------- git
+def _git(cwd, *args):
     try:
-        proc = subprocess.run(command, cwd=cwd, capture_output=True, timeout=timeout)
-    except FileNotFoundError as e:
-        raise SystemExit(f"ERROR: cannot execute {command[0]!r}: {e}")
-    except subprocess.TimeoutExpired:
-        raise SystemExit(f"ERROR: command timed out after {timeout}s: {' '.join(command)}")
-    duration_ms = int((time.monotonic() - t0) * 1000)
-    finished = _utc_now()
+        result = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=20
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
 
-    stdout, stderr = proc.stdout or b"", proc.stderr or b""
-    if not quiet:
-        sys.stdout.write(stdout.decode("utf-8", "replace"))
-        sys.stderr.write(stderr.decode("utf-8", "replace"))
 
-    run_dir = os.path.join(attest_dir, claim_id, started.strftime("%Y%m%dT%H%M%SZ"))
-    os.makedirs(run_dir, exist_ok=True)
-    for name, blob in (("stdout.log", stdout), ("stderr.log", stderr)):
-        with open(os.path.join(run_dir, name), "wb") as f:
-            f.write(blob)
-
-    file_hashes = []
-    for path in files:
-        entry = {"path": path}
+def _untracked_digest(cwd):
+    output = _git(cwd, "ls-files", "--others", "--exclude-standard", "-z")
+    if output is None:
+        return None
+    records = []
+    for relative in sorted(item for item in output.split("\0") if item):
+        path = os.path.join(cwd, relative)
         if os.path.isfile(path):
-            entry.update(sha256=sha256_file(path), bytes=os.path.getsize(path))
+            records.append([portable_path(relative), sha256_file(path)])
         else:
-            entry["missing"] = True
-        file_hashes.append(entry)
+            records.append([portable_path(relative), None])
+    return canonical_digest({"untracked": records})
 
-    verdict = "EVIDENCED" if proc.returncode == 0 else "DISPROVEN"
+
+def git_context(cwd):
+    commit = _git(cwd, "rev-parse", "HEAD")
+    if commit is None:
+        return {"available": False}
+    status = _git(cwd, "status", "--porcelain=v1", "--untracked-files=all") or ""
+    return {
+        "available": True,
+        "commit": commit,
+        "tree": _git(cwd, "rev-parse", "HEAD^{tree}"),
+        "branch": _git(cwd, "rev-parse", "--abbrev-ref", "HEAD"),
+        "dirty": bool(status),
+        "remote": _git(cwd, "config", "--get", "remote.origin.url"),
+        "submodules": _git(cwd, "submodule", "status", "--recursive") or "",
+        "untracked_digest": _untracked_digest(cwd),
+    }
+
+
+# -------------------------------------------------------------- schema check
+def _require(mapping, keys, label):
+    if not isinstance(mapping, dict):
+        raise ValueError(f"{label} must be an object")
+    missing = [key for key in keys if key not in mapping]
+    if missing:
+        raise ValueError(f"{label} missing required field(s): {', '.join(missing)}")
+
+
+_ATTESTATION_SCHEMA_CACHE = None
+
+
+def _schema_type_matches(value, expected):
+    checks = {
+        "object": lambda item: isinstance(item, dict),
+        "array": lambda item: isinstance(item, list),
+        "string": lambda item: isinstance(item, str),
+        "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
+        "boolean": lambda item: isinstance(item, bool),
+        "null": lambda item: item is None,
+    }
+    return checks.get(expected, lambda _item: False)(value)
+
+
+def _resolve_schema_ref(root_schema, reference):
+    if not reference.startswith("#/"):
+        raise ValueError(f"unsupported schema reference: {reference}")
+    node = root_schema
+    for part in reference[2:].split("/"):
+        node = node[part.replace("~1", "/").replace("~0", "~")]
+    return node
+
+
+def _validate_json_schema(value, schema, root_schema, path="$"):
+    if "$ref" in schema:
+        return _validate_json_schema(
+            value, _resolve_schema_ref(root_schema, schema["$ref"]), root_schema, path
+        )
+    if "const" in schema and value != schema["const"]:
+        raise ValueError(f"{path} must equal {schema['const']!r}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{path} is not one of {schema['enum']!r}")
+    expected_types = schema.get("type")
+    if expected_types:
+        if isinstance(expected_types, str):
+            expected_types = [expected_types]
+        if not any(_schema_type_matches(value, item) for item in expected_types):
+            raise ValueError(f"{path} has invalid type; expected {expected_types!r}")
+    if isinstance(value, dict):
+        required = schema.get("required", [])
+        missing = [key for key in required if key not in value]
+        if missing:
+            raise ValueError(f"{path} missing required field(s): {', '.join(missing)}")
+        properties = schema.get("properties", {})
+        if schema.get("additionalProperties") is False:
+            extra = sorted(set(value) - set(properties))
+            if extra:
+                raise ValueError(f"{path} has unauthorized field(s): {', '.join(extra)}")
+        for key, child in value.items():
+            if key in properties:
+                _validate_json_schema(child, properties[key], root_schema, f"{path}.{key}")
+    if isinstance(value, list):
+        minimum_items = schema.get("minItems")
+        if minimum_items is not None and len(value) < minimum_items:
+            raise ValueError(f"{path} must contain at least {minimum_items} item(s)")
+        item_schema = schema.get("items")
+        if item_schema:
+            for index, child in enumerate(value):
+                _validate_json_schema(child, item_schema, root_schema, f"{path}[{index}]")
+    if isinstance(value, str):
+        minimum_length = schema.get("minLength")
+        if minimum_length is not None and len(value) < minimum_length:
+            raise ValueError(f"{path} must contain at least {minimum_length} character(s)")
+        pattern = schema.get("pattern")
+        if pattern and not re.search(pattern, value):
+            raise ValueError(f"{path} does not match {pattern!r}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum = schema.get("minimum")
+        if minimum is not None and value < minimum:
+            raise ValueError(f"{path} must be >= {minimum}")
+
+
+def validate_attestation_document(document):
+    global _ATTESTATION_SCHEMA_CACHE
+    if _ATTESTATION_SCHEMA_CACHE is None:
+        schema_path = Path(__file__).resolve().parents[1] / "schemas" / "attestation-v1.schema.json"
+        _ATTESTATION_SCHEMA_CACHE = json.loads(schema_path.read_text(encoding="utf-8"))
+    _validate_json_schema(
+        document,
+        _ATTESTATION_SCHEMA_CACHE,
+        _ATTESTATION_SCHEMA_CACHE,
+    )
+    return True
+
+
+# -------------------------------------------------------------- output policy
+def _redact_output(raw, literal_values, regex_values):
+    text = raw.decode("utf-8", "replace")
+    for value in literal_values:
+        if value:
+            text = text.replace(value, "[REDACTED]")
+    for pattern in regex_values:
+        text = re.sub(pattern, "[REDACTED]", text)
+    return text.encode("utf-8")
+
+
+def _stream_record(name, run_dir, raw, original_bytes, redactions, regexes, max_bytes, no_body):
+    retained = _redact_output(raw, redactions, regexes)
+    truncated = len(retained) > max_bytes or original_bytes > len(raw)
+    retained = b"" if no_body else retained[:max_bytes]
+    path = os.path.join(run_dir, name)
+    _atomic_write(path, retained, 0o600)
+    return {
+        "path": path,
+        "sha256": sha256_bytes(retained),
+        "original_bytes": original_bytes,
+        "stored_bytes": len(retained),
+        "truncated": bool(truncated),
+        "body_stored": not no_body,
+        "tail": retained.decode("utf-8", "replace")[-TAIL_CHARS:],
+    }
+
+
+def _read_bounded(handle, max_bytes):
+    handle.flush()
+    original = os.fstat(handle.fileno()).st_size
+    handle.seek(0)
+    # Redaction can alter length, so retain a bounded cushion before truncation.
+    limit = min(max(max_bytes * 4, 65536), 8 * 1024 * 1024)
+    return handle.read(limit), original
+
+
+def _recorded_path(path, cwd):
+    absolute = os.path.abspath(path)
+    try:
+        relative = os.path.relpath(absolute, cwd)
+    except ValueError:  # different Windows drives
+        return portable_path(absolute)
+    if relative == ".." or relative.startswith(".." + os.sep):
+        return portable_path(absolute)
+    return portable_path(relative)
+
+
+def _resolve_recorded_path(recorded, attestation_path=None):
+    native = recorded.replace("/", os.sep)
+    if os.path.isabs(native) or re.match(r"^[A-Za-z]:[/\\]", recorded):
+        return native
+    candidates = [os.path.join(os.getcwd(), native)]
+    if attestation_path:
+        current = os.path.abspath(os.path.dirname(attestation_path))
+        for _ in range(10):
+            candidates.append(os.path.join(current, native))
+            parent = os.path.dirname(current)
+            if parent == current:
+                break
+            current = parent
+    return next((candidate for candidate in candidates if os.path.exists(candidate)), candidates[0])
+
+
+# ------------------------------------------------------------------- capture
+def _claim_snapshot(ledger, claim_id, cwd):
+    if not ledger:
+        return {
+            "id": claim_id,
+            "level": "",
+            "text": "",
+            "gate": "",
+            "row_sha256": None,
+            "ledger_sha256_before": None,
+            "status_before": None,
+        }
+    text = Path(ledger).read_text(encoding="utf-8")
+    claim, _lines, _cells = _read_claim_from_text(text, claim_id)
+    return {
+        "id": claim["id"],
+        "level": claim["level"],
+        "text": claim["text"],
+        "gate": claim["gate"],
+        "row_sha256": claim["row_sha256"],
+        "ledger_sha256_before": sha256_bytes(text.encode("utf-8")),
+        "status_before": claim["status"],
+    }
+
+
+def _new_run_dir(attest_dir, claim_id, private):
+    root = Path(attest_dir)
+    if private and "private" not in root.name.lower():
+        root = root.with_name(root.name + "-private")
+    timestamp = utc_now().strftime("%Y%m%dT%H%M%S.%fZ")
+    run_dir = root / claim_id / f"{timestamp}-{uuid.uuid4()}"
+    os.makedirs(run_dir, mode=0o700, exist_ok=False)
+    return str(run_dir)
+
+
+def _file_entries(required_files, optional_files, cwd):
+    missing = [path for path in required_files if not os.path.isfile(path)]
+    if missing:
+        raise FileNotFoundError(
+            "required evidence file missing: " + ", ".join(portable_path(path) for path in missing)
+        )
+    entries = []
+    for path in required_files:
+        entries.append(
+            {
+                "path": _recorded_path(path, cwd),
+                "optional": False,
+                "missing": False,
+                "sha256": sha256_file(path),
+                "bytes": os.path.getsize(path),
+            }
+        )
+    for path in optional_files:
+        if os.path.isfile(path):
+            entries.append(
+                {
+                    "path": _recorded_path(path, cwd),
+                    "optional": True,
+                    "missing": False,
+                    "sha256": sha256_file(path),
+                    "bytes": os.path.getsize(path),
+                }
+            )
+        else:
+            entries.append(
+                {"path": _recorded_path(path, cwd), "optional": True, "missing": True}
+            )
+    return entries
+
+
+def run_and_attest(
+    claim_id,
+    command,
+    ledger=None,
+    files=(),
+    optional_files=(),
+    attest_dir=DEFAULT_ATTEST_DIR,
+    cwd=None,
+    timeout=None,
+    quiet=False,
+    tier="standard",
+    builder=None,
+    allow_dirty=False,
+    auto_approve_lite=False,
+    redact=(),
+    redact_regex=(),
+    max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES,
+    no_output_body=False,
+    private=False,
+):
+    """Run a gate and write a claim-bound capture attestation."""
+    if not command:
+        raise ValueError("no gate command supplied")
+    tier = tier.lower()
+    if tier not in {"lite", "standard", "regulated"}:
+        raise ValueError(f"unknown tier: {tier}")
+    if auto_approve_lite and tier != "lite":
+        raise ValueError("--auto-approve-lite is only valid in Lite mode")
+    if max_output_bytes < 0:
+        raise ValueError("max_output_bytes must be non-negative")
+    cwd = os.path.abspath(cwd or os.getcwd())
+    ledger = os.path.abspath(ledger) if ledger else None
+    required_files = [os.path.abspath(path) for path in files]
+    optional_files = [os.path.abspath(path) for path in optional_files]
+    file_entries = _file_entries(required_files, optional_files, cwd)
+    claim = _claim_snapshot(ledger, claim_id, cwd)
+    git = git_context(cwd)
+    if tier == "regulated":
+        if allow_dirty:
+            raise ValueError("--allow-dirty is forbidden in Regulated mode")
+        if not git.get("available") or git.get("dirty"):
+            raise ValueError("Regulated capture requires a clean Git tree")
+        if not builder:
+            raise ValueError("Regulated capture requires --builder")
+    if git.get("dirty") and not allow_dirty and tier in {"lite", "standard"}:
+        # Dirty captures remain allowed outside Regulated, but the exception is explicit.
+        dirty_override = False
+    else:
+        dirty_override = bool(allow_dirty)
+    builder = builder or os.environ.get("WINCREATOR_BUILDER") or getpass.getuser()
+    run_dir = _new_run_dir(attest_dir, claim_id, private)
+    started = utc_now()
+    start_clock = time.monotonic()
+    child_env = os.environ.copy()
+    child_env.pop(SIGNING_KEY_ENV, None)
+    capture_error = None
+    return_code = None
+    with tempfile.TemporaryFile() as stdout_handle, tempfile.TemporaryFile() as stderr_handle:
+        try:
+            process = subprocess.Popen(
+                list(command),
+                cwd=cwd,
+                env=child_env,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+            try:
+                return_code = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                capture_error = f"command timed out after {timeout}s"
+        except OSError as error:
+            capture_error = f"cannot execute {command[0]!r}: {error}"
+            stderr_handle.write(capture_error.encode("utf-8"))
+        stdout_raw, stdout_original = _read_bounded(stdout_handle, max_output_bytes)
+        stderr_raw, stderr_original = _read_bounded(stderr_handle, max_output_bytes)
+    duration_ms = int((time.monotonic() - start_clock) * 1000)
+    finished = utc_now()
+    stdout_record = _stream_record(
+        "stdout.log",
+        run_dir,
+        stdout_raw,
+        stdout_original,
+        redact,
+        redact_regex,
+        max_output_bytes,
+        no_output_body,
+    )
+    stderr_record = _stream_record(
+        "stderr.log",
+        run_dir,
+        stderr_raw,
+        stderr_original,
+        redact,
+        redact_regex,
+        max_output_bytes,
+        no_output_body,
+    )
+    if not quiet:
+        sys.stdout.write(stdout_record["tail"])
+        sys.stderr.write(stderr_record["tail"])
+    if capture_error:
+        capture_status = "CAPTURE_ERROR"
+    elif return_code == 0:
+        capture_status = "CAPTURED_PASS"
+    else:
+        capture_status = "CAPTURED_FAIL"
+    for stream in (stdout_record, stderr_record):
+        stream["path"] = _recorded_path(stream["path"], cwd)
     payload = {
-        "schema": SCHEMA,
         "tool_version": VERSION,
-        "claim_id": claim_id,
-        "ledger": os.path.relpath(ledger, cwd) if ledger else None,
-        "verdict": verdict,
+        "claim": claim,
+        "ledger": _recorded_path(ledger, cwd) if ledger else None,
+        "builder": builder,
         "command": list(command),
-        "command_string": " ".join(command),
-        "exit_code": proc.returncode,
+        "command_string": shlex.join(list(command)),
+        "capture": {
+            "status": capture_status,
+            "exit_code": return_code,
+            "error": capture_error,
+        },
+        "started_at": iso_time(started),
+        "finished_at": iso_time(finished),
         "duration_ms": duration_ms,
-        "started_at": _iso(started),
-        "finished_at": _iso(finished),
-        "cwd": cwd,
-        "git": git_context(cwd),
+        "stdout": stdout_record,
+        "stderr": stderr_record,
+        "files": file_entries,
+        "git": git,
         "environment": {
             "platform": platform.platform(),
             "python": platform.python_version(),
-            "node": platform.node(),
+            "hostname": platform.node(),
+            "cwd": portable_path(cwd),
+            "ci": os.environ.get("CI", ""),
+            "user": getpass.getuser(),
         },
-        "stdout": {
-            "path": os.path.join(run_dir, "stdout.log"),
-            "sha256": sha256_bytes(stdout),
-            "bytes": len(stdout),
-            "tail": stdout.decode("utf-8", "replace")[-TAIL_CHARS:],
+        "policy": {
+            "tier": tier,
+            "dirty_override": dirty_override,
+            "private": bool(private),
+            "redaction_literals": len(tuple(redact)),
+            "redaction_regexes": len(tuple(redact_regex)),
+            "max_output_bytes": max_output_bytes,
+            "no_output_body": bool(no_output_body),
         },
-        "stderr": {
-            "path": os.path.join(run_dir, "stderr.log"),
-            "sha256": sha256_bytes(stderr),
-            "bytes": len(stderr),
-            "tail": stderr.decode("utf-8", "replace")[-TAIL_CHARS:],
-        },
-        "files": file_hashes,
     }
     digest = canonical_digest(payload)
-    attestation = {"payload": payload, "digest": {"alg": "sha256", "value": digest}}
-    signature = sign(digest)
+    attestation = {
+        "schema": ATTESTATION_SCHEMA,
+        "payload": payload,
+        "digest": {
+            "algorithm": "sha256",
+            "canonicalization": "json/sorted-compact/utf-8",
+            "value": digest,
+        },
+    }
+    signature = _signature(digest)
     if signature:
         attestation["signature"] = signature
+    validate_attestation_document(attestation)
+    attestation_path = os.path.join(run_dir, "attestation.json")
+    _atomic_json(attestation_path, attestation)
 
-    att_path = os.path.join(run_dir, "attestation.json")
-    with open(att_path, "w", encoding="utf-8") as f:
-        json.dump(attestation, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    return attestation, att_path, proc.returncode
+    if ledger:
+        evidence = capture_evidence_sentence(payload, attestation_path, digest, cwd)
+        if capture_status == "CAPTURED_PASS":
+            ledger_status = "PENDING"
+        elif capture_status == "CAPTURED_FAIL":
+            ledger_status = "DISPROVEN"
+        else:
+            ledger_status = "BLOCKED"
+        update_ledger(
+            ledger,
+            claim_id,
+            ledger_status,
+            evidence,
+            expected_row_sha=claim["row_sha256"],
+        )
+    if capture_status == "CAPTURED_PASS" and auto_approve_lite:
+        if ledger:
+            review_attestation(
+                attestation_path,
+                "EVIDENCED",
+                "auto-approve-lite",
+                ledger,
+                automatic=True,
+            )
+    effective_code = 0 if capture_status == "CAPTURED_PASS" else (return_code or 2)
+    return attestation, attestation_path, effective_code
 
 
-def evidence_sentence(payload, att_path, digest) -> str:
-    """The Evidence cell text — machine-written, and re-checkable by `verify`."""
-    git = payload["git"]
-    commit = (git.get("commit") or "")[:12] if git.get("available") else "no-git"
-    dirty = "+dirty" if git.get("dirty") else ""
-    tail = payload["stdout"]["tail"].strip().splitlines()
-    last = tail[-1][:120] if tail else "(no stdout)"
-    return (f"wincreator prove {payload['started_at']}: `{payload['command_string']}` "
-            f"-> exit={payload['exit_code']} ({payload['duration_ms']} ms); "
-            f"stdout tail: {last}; commit {commit}{dirty}; "
-            f"attestation {att_path} sha256={digest}")
+def capture_evidence_sentence(payload, attestation_path, digest, cwd=None):
+    cwd = cwd or os.getcwd()
+    path = _recorded_path(attestation_path, cwd)
+    capture = payload["capture"]
+    exit_value = "none" if capture["exit_code"] is None else capture["exit_code"]
+    return (
+        f"wincreator capture {payload['started_at']}: `{payload['command_string']}` "
+        f"-> {capture['status']} exit={exit_value} ({payload['duration_ms']} ms); "
+        f"claim_sha256={payload['claim']['row_sha256']}; "
+        f"attestation {path} sha256={digest}"
+    )
 
 
-def cmd_prove(args):
-    if not args.command:
-        print("ERROR: no command. Usage: wincreator.py prove <ID> [options] "
-              "-- <command...>  (the `--` is required: everything after it is "
-              "the gate, verbatim)")
-        return 2
-    ledger = args.ledger
-    if not args.no_ledger and not os.path.isfile(ledger):
-        print(f"ERROR: ledger not found: {ledger} (use --no-ledger to attest only)")
-        return 2
-    attestation, att_path, exit_code = run_and_attest(
-        args.claim_id, args.command, ledger=None if args.no_ledger else ledger,
-        files=args.file, attest_dir=args.attest_dir, timeout=args.timeout)
+# -------------------------------------------------------------------- review
+def _load_json(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def review_attestation(attestation_path, verdict, reviewer, ledger=None, automatic=False):
+    verdict = verdict.upper()
+    if verdict not in {"EVIDENCED", "INSUFFICIENT", "DISPROVEN"}:
+        raise ValueError(f"invalid review verdict: {verdict}")
+    ok, problems = verify_attestation(attestation_path)
+    if not ok:
+        raise ValueError("capture failed verification: " + "; ".join(problems))
+    attestation = _load_json(attestation_path)
     payload = attestation["payload"]
-    digest = attestation["digest"]["value"]
-    verdict = payload["verdict"]
-    if not args.no_ledger:
-        try:
-            old = update_ledger(ledger, args.claim_id, verdict,
-                                evidence_sentence(payload, att_path, digest))
-        except KeyError:
-            print(f"ERROR: no row with ID '{args.claim_id}' in {ledger} — "
-                  f"attestation kept at {att_path}, ledger untouched")
-            return 2
-        print(f"\n[{verdict}] {args.claim_id}: {old} -> {verdict} in {ledger}")
-    print(f"[ATTESTATION] {att_path} sha256={digest}"
-          + (" (signed)" if "signature" in attestation else ""))
-    if verdict == "DISPROVEN":
-        print(f"[GATE FAILED] exit={exit_code} — the claim is recorded DISPROVEN, "
-              f"not EVIDENCED. A failed gate cannot be written as a proof.")
-        return 1
-    return 0
+    capture_status = payload["capture"]["status"]
+    if capture_status == "CAPTURED_FAIL" and verdict == "EVIDENCED":
+        raise ValueError("CAPTURED_FAIL can never become EVIDENCED")
+    if capture_status == "CAPTURE_ERROR" and verdict != "INSUFFICIENT":
+        raise ValueError("CAPTURE_ERROR can only be reviewed INSUFFICIENT")
+    if capture_status == "CAPTURED_PASS" and verdict == "DISPROVEN":
+        # A reviewer can disprove the claim when the gate passed for the wrong reason.
+        pass
+    if payload["policy"]["tier"] == "regulated" and reviewer == payload["builder"]:
+        raise ValueError("Regulated builder and reviewer must differ")
+    reviewed_at = iso_time(utc_now())
+    review_payload = {
+        "tool_version": VERSION,
+        "claim": payload["claim"],
+        "capture_digest": attestation["digest"]["value"],
+        "capture_path": _recorded_path(attestation_path, os.getcwd()),
+        "capture_status": capture_status,
+        "verdict": verdict,
+        "reviewer": reviewer,
+        "reviewed_at": reviewed_at,
+        "automatic": bool(automatic),
+    }
+    digest = canonical_digest(review_payload)
+    review = {
+        "schema": REVIEW_SCHEMA,
+        "payload": review_payload,
+        "digest": {
+            "algorithm": "sha256",
+            "canonicalization": "json/sorted-compact/utf-8",
+            "value": digest,
+        },
+    }
+    signature = _signature(digest)
+    if signature:
+        review["signature"] = signature
+    review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
+    _atomic_json(review_path, review)
+    if ledger:
+        ledger = os.path.abspath(ledger)
+        status = {
+            "EVIDENCED": "EVIDENCED",
+            "INSUFFICIENT": "INSUFFICIENT",
+            "DISPROVEN": "DISPROVEN",
+        }[verdict]
+        evidence = review_evidence_sentence(
+            payload, attestation_path, attestation["digest"]["value"], review, review_path, os.path.dirname(ledger)
+        )
+        update_ledger(
+            ledger,
+            payload["claim"]["id"],
+            status,
+            evidence,
+            expected_row_sha=payload["claim"]["row_sha256"],
+        )
+    return review, review_path
 
 
-# ------------------------------------------------------------------- verify
+def review_evidence_sentence(payload, attestation_path, attestation_digest, review, review_path, cwd=None):
+    cwd = cwd or os.getcwd()
+    capture_sentence = capture_evidence_sentence(payload, attestation_path, attestation_digest, cwd)
+    review_payload = review["payload"]
+    return (
+        f"{capture_sentence}; review {_recorded_path(review_path, cwd)} "
+        f"verdict={review_payload['verdict']} reviewer={review_payload['reviewer']} "
+        f"reviewed_at={review_payload['reviewed_at']} "
+        f"sha256={review['digest']['value']}"
+    )
+
+
+# -------------------------------------------------------------------- verify
 def verify_attestation(path, check_artifacts=True):
-    """Return (ok, [problems]) for one attestation file."""
     problems = []
     try:
-        with open(path, encoding="utf-8") as f:
-            attestation = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        return False, [f"unreadable: {e}"]
-    payload = attestation.get("payload")
-    recorded = attestation.get("digest", {}).get("value")
-    if not payload or not recorded:
-        return False, ["malformed attestation (missing payload or digest)"]
+        document = _load_json(path)
+        validate_attestation_document(document)
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        return False, [f"unreadable or schema-invalid: {error}"]
+    payload = document["payload"]
+    recorded = document["digest"]["value"]
+    if document["digest"].get("algorithm") != "sha256":
+        problems.append("unsupported digest algorithm")
     if canonical_digest(payload) != recorded:
         problems.append("digest mismatch — the attestation body was edited")
-    signature = attestation.get("signature")
-    if signature:
-        expected = sign(recorded)
-        if expected is None:
-            problems.append(f"signed with key_id {signature.get('key_id')} but "
-                            f"${SIGNING_KEY_ENV} is not set — cannot verify")
-        elif not hmac.compare_digest(expected["value"], signature.get("value", "")):
-            problems.append("signature mismatch — wrong key or forged attestation")
+    _check_signature(document, problems)
+    if payload["claim"]["row_sha256"] and claim_row_sha256(payload["claim"]) != payload["claim"]["row_sha256"]:
+        problems.append("claim row digest mismatch")
     if check_artifacts:
-        for stream in ("stdout", "stderr"):
-            rec = payload.get(stream, {})
-            spath = rec.get("path")
-            if not spath or not os.path.isfile(spath):
-                problems.append(f"{stream} log missing: {spath}")
-            elif sha256_file(spath) != rec.get("sha256"):
-                problems.append(f"{stream} log modified since capture: {spath}")
-        for entry in payload.get("files", []):
-            if entry.get("missing"):
+        for stream_name in ("stdout", "stderr"):
+            stream = payload[stream_name]
+            resolved = _resolve_recorded_path(stream["path"], path)
+            if not os.path.isfile(resolved):
+                problems.append(f"{stream_name} log missing: {stream['path']}")
+            elif sha256_file(resolved) != stream["sha256"]:
+                problems.append(f"{stream_name} log modified since capture: {stream['path']}")
+        for entry in payload["files"]:
+            if entry.get("optional") and entry.get("missing"):
                 continue
-            if not os.path.isfile(entry["path"]):
+            if entry.get("missing"):
+                problems.append(f"required attested file was missing: {entry.get('path')}")
+                continue
+            resolved = _resolve_recorded_path(entry["path"], path)
+            if not os.path.isfile(resolved):
                 problems.append(f"attested file missing: {entry['path']}")
-            elif sha256_file(entry["path"]) != entry["sha256"]:
+            elif sha256_file(resolved) != entry["sha256"]:
                 problems.append(f"attested file changed since capture: {entry['path']}")
     return not problems, problems
 
 
+def verify_review(path, capture_path=None):
+    problems = []
+    try:
+        review = _load_json(path)
+    except (OSError, json.JSONDecodeError) as error:
+        return False, [f"unreadable review: {error}"]
+    if review.get("schema") != REVIEW_SCHEMA:
+        return False, ["unsupported review schema"]
+    payload = review.get("payload")
+    digest = review.get("digest", {}).get("value")
+    if not isinstance(payload, dict) or not digest:
+        return False, ["malformed review"]
+    if canonical_digest(payload) != digest:
+        problems.append("review digest mismatch")
+    _check_signature(review, problems)
+    if capture_path:
+        capture = _load_json(capture_path)
+        if payload.get("capture_digest") != capture.get("digest", {}).get("value"):
+            problems.append("review does not reference this capture digest")
+        if payload.get("claim") != capture.get("payload", {}).get("claim"):
+            problems.append("review claim does not match capture claim")
+        if capture.get("payload", {}).get("capture", {}).get("status") == "CAPTURED_FAIL" and payload.get("verdict") == "EVIDENCED":
+            problems.append("CAPTURED_FAIL was laundered into EVIDENCED")
+    return not problems, problems
+
+
 def iter_attestations(attest_dir):
-    for root, _dirs, files in os.walk(attest_dir):
-        for name in sorted(files):
-            if name == "attestation.json":
-                yield os.path.join(root, name)
+    for root, directories, files in os.walk(attest_dir):
+        directories[:] = [name for name in directories if name not in {".git", "dist", "__pycache__"}]
+        if "attestation.json" in files:
+            yield os.path.join(root, "attestation.json")
 
 
-LEDGER_ATTESTATION_REF = re.compile(
-    r"attestation\s+(?P<path>\S+?\.json)\s+sha256=(?P<digest>[0-9a-f]{64})")
+def _discover_ledger_attestations(ledger_path):
+    root = os.path.dirname(os.path.abspath(ledger_path))
+    matches = []
+    for current, directories, files in os.walk(root):
+        directories[:] = [name for name in directories if name not in {".git", "dist", "__pycache__"}]
+        if "attestation.json" not in files:
+            continue
+        path = os.path.join(current, "attestation.json")
+        try:
+            document = _load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        recorded = document.get("payload", {}).get("ledger")
+        if recorded and os.path.basename(recorded) == os.path.basename(ledger_path):
+            matches.append(path)
+    return matches
 
 
 def verify_ledger_references(ledger_path):
-    """Every attestation referenced by the ledger must exist, match, and agree
-    with the status the row claims. Hand-editing a row back to EVIDENCED after
-    a DISPROVEN run is exactly the move this catches."""
     problems = []
     checked = 0
     try:
-        with open(ledger_path, encoding="utf-8") as f:
-            text = f.read()
-    except OSError as e:
-        return 0, [f"cannot read {ledger_path}: {e}"]
-    for line in text.splitlines():
-        match = LEDGER_ATTESTATION_REF.search(line)
-        if not match:
-            continue
+        ledger_text = Path(ledger_path).read_text(encoding="utf-8")
+    except OSError as error:
+        return 0, [f"cannot read {ledger_path}: {error}"]
+    referenced = [match.group("path") for match in ATTESTATION_REF.finditer(ledger_text)]
+    capture_paths = []
+    for recorded in referenced:
+        capture_paths.append(_resolve_recorded_path(recorded, ledger_path))
+    capture_paths.extend(_discover_ledger_attestations(ledger_path))
+    unique = []
+    seen = set()
+    for path in capture_paths:
+        real = os.path.realpath(path)
+        if real not in seen:
+            seen.add(real)
+            unique.append(path)
+    for capture_path in unique:
         checked += 1
-        path, digest = match.group("path"), match.group("digest")
-        if not os.path.isfile(path):
-            problems.append(f"{ledger_path}: referenced attestation missing: {path}")
+        ok, capture_problems = verify_attestation(capture_path)
+        if not ok:
+            problems.extend(f"{capture_path}: {problem}" for problem in capture_problems)
             continue
-        with open(path, encoding="utf-8") as f:
-            attestation = json.load(f)
-        payload = attestation.get("payload", {})
-        # Recomputed, not read: an edited attestation that kept its old digest
-        # field would otherwise still match the ledger.
-        actual = canonical_digest(payload)
-        if actual != digest:
-            problems.append(f"{ledger_path}: evidence cites sha256={digest[:12]}… but "
-                            f"{path} now hashes to {actual[:12]}… — the attestation "
-                            f"was edited after the ledger row was written")
+        capture = _load_json(capture_path)
+        payload = capture["payload"]
+        claim = payload["claim"]
+        try:
+            current = read_claim(ledger_path, claim["id"])
+        except (KeyError, ValueError) as error:
+            problems.append(f"{ledger_path}: captured claim {claim['id']} not uniquely present: {error}")
             continue
-        cells = SPLIT_UNESCAPED_PIPE.split(line.strip()[1:-1])
-        if len(cells) >= 6:
-            row_id = cells[0].strip()
-            row_status = cells[4].strip().strip("*`_~").upper()
-            verdict = payload.get("verdict")
-            if row_status != verdict:
-                problems.append(
-                    f"{ledger_path}: row {row_id} says {row_status} but its "
-                    f"attestation recorded {verdict} (exit={payload.get('exit_code')}) "
-                    f"— the status was hand-edited away from the captured result")
-            expected = escape_cell(evidence_sentence(payload, path, digest))
-            if not cells[5].strip().startswith(expected):
-                problems.append(
-                    f"{ledger_path}: row {row_id} evidence text was rewritten after "
-                    f"capture (the captured sentence is machine-owned; append your "
-                    f"notes after it instead of editing it)")
+        for key, current_key in (("id", "id"), ("level", "level"), ("text", "text"), ("gate", "gate")):
+            if claim[key] != current[current_key]:
+                problems.append(f"{ledger_path}: row {claim['id']} {key} changed after capture")
+        if current["row_sha256"] != claim["row_sha256"]:
+            problems.append(f"{ledger_path}: row {claim['id']} hash changed after capture")
+        review_path = os.path.join(os.path.dirname(capture_path), "review.json")
+        if os.path.isfile(review_path):
+            review_ok, review_problems = verify_review(review_path, capture_path)
+            if not review_ok:
+                problems.extend(f"{review_path}: {problem}" for problem in review_problems)
+                continue
+            review = _load_json(review_path)
+            verdict = review["payload"]["verdict"]
+            expected_status = {
+                "EVIDENCED": "EVIDENCED",
+                "INSUFFICIENT": "INSUFFICIENT",
+                "DISPROVEN": "DISPROVEN",
+            }[verdict]
+            expected_evidence = review_evidence_sentence(
+                payload,
+                capture_path,
+                capture["digest"]["value"],
+                review,
+                review_path,
+                os.path.dirname(os.path.abspath(ledger_path)),
+            )
+        else:
+            expected_status = {
+                "CAPTURED_PASS": "PENDING",
+                "CAPTURED_FAIL": "DISPROVEN",
+                "CAPTURE_ERROR": "BLOCKED",
+            }[payload["capture"]["status"]]
+            expected_evidence = capture_evidence_sentence(
+                payload,
+                capture_path,
+                capture["digest"]["value"],
+                os.path.dirname(os.path.abspath(ledger_path)),
+            )
+        if current["status"] != expected_status:
+            problems.append(
+                f"{ledger_path}: row {claim['id']} status {current['status']} does not match "
+                f"capture/review status {expected_status}"
+            )
+        if not current["evidence"].startswith(expected_evidence):
+            problems.append(f"{ledger_path}: row {claim['id']} evidence was rewritten after capture/review")
+        if expected_status != "EVIDENCED":
+            problems.append(
+                f"{ledger_path}: row {claim['id']} is {expected_status}; "
+                "capture integrity is valid but the claim is not evidenced"
+            )
     return checked, problems
 
 
-def cmd_verify(args):
-    targets = args.attestations or list(iter_attestations(args.attest_dir))
-    problems = []
-    if not targets and not args.ledger:
-        print(f"ERROR: no attestation found under {args.attest_dir}")
+# ---------------------------------------------------------------------- CLI
+def _latest_attestation(attest_dir, claim_id):
+    root = os.path.join(attest_dir, claim_id)
+    paths = sorted(iter_attestations(root)) if os.path.isdir(root) else []
+    if not paths:
+        raise FileNotFoundError(f"no attestation found for {claim_id} under {attest_dir}")
+    return paths[-1]
+
+
+def cmd_prove(args):
+    try:
+        attestation, path, code = run_and_attest(
+            args.claim_id,
+            args.command,
+            ledger=None if args.no_ledger else args.ledger,
+            files=args.file,
+            optional_files=args.optional_file,
+            attest_dir=args.attest_dir,
+            timeout=args.timeout,
+            tier=args.tier,
+            builder=args.builder,
+            allow_dirty=args.allow_dirty,
+            auto_approve_lite=args.auto_approve_lite,
+            redact=args.redact,
+            redact_regex=args.redact_regex,
+            max_output_bytes=args.max_output_bytes,
+            no_output_body=args.no_output_body,
+            private=args.private,
+        )
+    except (OSError, ValueError, KeyError, RuntimeError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
         return 2
-    for path in targets:
-        ok, issues = verify_attestation(path)
-        mark = "OK  " if ok else "FAIL"
-        print(f"  [{mark}] {path}")
-        for issue in issues:
-            print(f"         ✗ {issue}")
-        problems.extend(issues)
-    if args.ledger:
-        checked, ledger_problems = verify_ledger_references(args.ledger)
-        print(f"  [LEDGER] {checked} attestation reference(s) in {args.ledger}")
-        for issue in ledger_problems:
-            print(f"         ✗ {issue}")
-        problems.extend(ledger_problems)
-    if problems:
-        print(f"VERIFY FAILED — {len(problems)} problem(s)")
-        return 1
-    print(f"VERIFY OK — {len(targets)} attestation(s) match their artifacts")
+    capture = attestation["payload"]["capture"]
+    print(f"[{capture['status']}] {args.claim_id} exit={capture['exit_code']}")
+    print(f"[ATTESTATION] {path} sha256={attestation['digest']['value']}")
+    payload = attestation["payload"]
+    if (payload["policy"]["tier"] == "standard"
+            and not payload["git"].get("available")
+            and not payload["files"]):
+        print(
+            "[WARNING] Standard capture has no Git snapshot or attested files; "
+            "use --file for source inputs that must be bound to the claim."
+        )
+    if capture["status"] == "CAPTURED_PASS" and not args.auto_approve_lite:
+        print("[REVIEW REQUIRED] run `wincreator review` before claiming EVIDENCED")
+    return code
+
+
+def cmd_review(args):
+    try:
+        path = args.attestation or _latest_attestation(args.attest_dir, args.claim_id)
+        review, review_path = review_attestation(
+            path,
+            args.verdict,
+            args.reviewer,
+            ledger=None if args.no_ledger else args.ledger,
+        )
+    except (OSError, ValueError, KeyError, RuntimeError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+    print(
+        f"[{review['payload']['verdict']}] {args.claim_id} reviewed by "
+        f"{review['payload']['reviewer']}"
+    )
+    print(f"[REVIEW] {review_path} sha256={review['digest']['value']}")
     return 0
 
 
-# ---------------------------------------------------------------- self-test
-LEDGER_FIXTURE = """# Proof Ledger — self-test
-
-| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
-|----|-------|-------|------------------------|--------|----------|
-| P1 | Micro | the good command succeeds | run it | CLAIMED | |
-| P2 | Micro | the bad command succeeds | run it | CLAIMED | |
-"""
-
-
-def _row_status(ledger_path, claim_id):
-    with open(ledger_path, encoding="utf-8") as f:
-        lines = f.read().splitlines(keepends=True)
-    _idx, cells = find_row(lines, claim_id)
-    return (cells[4].strip(), cells[5].strip()) if cells else (None, None)
+def cmd_verify(args):
+    targets = list(args.attestations)
+    if not targets and args.attest_dir:
+        targets = list(iter_attestations(args.attest_dir))
+    all_problems = []
+    for path in targets:
+        ok, problems = verify_attestation(path)
+        print(f"  [{'OK' if ok else 'FAIL'}] {path}")
+        for problem in problems:
+            print(f"       - {problem}")
+        all_problems.extend(problems)
+    checked = 0
+    if args.ledger:
+        checked, problems = verify_ledger_references(args.ledger)
+        print(f"  [LEDGER] {checked} capture(s) checked in {args.ledger}")
+        for problem in problems:
+            print(f"       - {problem}")
+        all_problems.extend(problems)
+        if checked == 0:
+            all_problems.append(
+                f"{args.ledger}: no capture attestation references were found"
+            )
+    if not targets and not args.ledger:
+        print("ERROR: no attestation or ledger supplied", file=sys.stderr)
+        return 2
+    if all_problems:
+        for problem in all_problems:
+            if problem.endswith("no capture attestation references were found"):
+                print(f"       - {problem}")
+        print(f"VERIFY FAILED — {len(all_problems)} problem(s)")
+        return 1
+    print(f"VERIFY OK — {len(targets) + checked} verification target(s)")
+    return 0
 
 
 def self_test():
-    """Adversarial suite for the capture layer itself — the same law the skill
-    applies to everything else: a verifier that was never attacked is an
-    unverified claim."""
     results = []
 
-    def check(name, condition, detail=""):
-        results.append((name, bool(condition), detail))
+    def check(name, condition):
+        results.append((name, bool(condition)))
 
-    workdir = tempfile.mkdtemp(prefix="wincreator-selftest-")
-    old_cwd = os.getcwd()
-    old_key = os.environ.get(SIGNING_KEY_ENV)
-    try:
-        os.chdir(workdir)
-        ledger = os.path.join(workdir, "PROOF_LEDGER.md")
-        with open(ledger, "w", encoding="utf-8") as f:
-            f.write(LEDGER_FIXTURE)
-        attest_dir = os.path.join(workdir, DEFAULT_ATTEST_DIR)
-
-        # 1. a passing gate becomes EVIDENCED, with a real captured tail
-        att, path, code = run_and_attest(
-            "P1", [sys.executable, "-c", "print('42 rows exported')"],
-            ledger=ledger, attest_dir=attest_dir, quiet=True)
-        digest = att["digest"]["value"]
-        update_ledger(ledger, "P1", att["payload"]["verdict"],
-                      evidence_sentence(att["payload"], path, digest))
-        status, evidence = _row_status(ledger, "P1")
-        check("passing_gate_is_evidenced", status == "EVIDENCED", status)
-        check("evidence_carries_exit_code", "exit=0" in evidence)
-        check("evidence_carries_attestation_digest", digest in evidence)
-        check("stdout_captured", "42 rows exported" in att["payload"]["stdout"]["tail"])
-        check("exit_code_recorded", code == 0 and att["payload"]["exit_code"] == 0)
-
-        # 2. a failing gate can NEVER be written EVIDENCED
-        att2, path2, code2 = run_and_attest(
-            "P2", [sys.executable, "-c",
-                   "import sys; sys.stderr.write('boom'); sys.exit(3)"],
-            ledger=ledger, attest_dir=attest_dir, quiet=True)
-        update_ledger(ledger, "P2", att2["payload"]["verdict"],
-                      evidence_sentence(att2["payload"], path2, att2["digest"]["value"]))
-        status2, _ = _row_status(ledger, "P2")
-        check("failing_gate_is_disproven", status2 == "DISPROVEN", status2)
-        check("failing_gate_never_evidenced", att2["payload"]["verdict"] != "EVIDENCED")
-        check("failing_exit_code_recorded", code2 == 3)
-        check("stderr_captured", "boom" in att2["payload"]["stderr"]["tail"])
-
-        # 3. the resulting ledger is parseable by the mechanical gate
-        try:
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            import ledger_check
-            violations, rows = ledger_check.check_text(open(ledger, encoding="utf-8").read())
-            check("ledger_gate_sees_both_rows", rows == 2, f"rows={rows}")
-            check("ledger_gate_accepts_captured_evidence",
-                  not any("P1" in v for v in violations), str(violations))
-            check("ledger_gate_blocks_on_disproven",
-                  any("P2" in v and "DISPROVEN" in v for v in violations), str(violations))
-        except ImportError as e:  # pragma: no cover
-            check("ledger_check_importable", False, str(e))
-
-        # 4. pipes and newlines in captured output cannot break the table
-        att3, path3, _ = run_and_attest(
-            "P1", [sys.executable, "-c", r"print('a | b'); print('second line')"],
-            ledger=ledger, attest_dir=attest_dir, quiet=True)
-        update_ledger(ledger, "P1", att3["payload"]["verdict"],
-                      evidence_sentence(att3["payload"], path3, att3["digest"]["value"]))
-        with open(ledger, encoding="utf-8") as f:
-            ledger_text = f.read()
-        row = [l for l in ledger_text.splitlines() if l.startswith("| P1 ")][0]
-        check("pipe_in_output_escaped", len(SPLIT_UNESCAPED_PIPE.split(row)) == 8,
-              str(len(SPLIT_UNESCAPED_PIPE.split(row))))
-        check("newline_in_output_flattened", "\n" not in row)
-
-        # 5. verify passes on untouched artifacts...
-        ok, issues = verify_attestation(path2)
-        check("verify_ok_on_untouched", ok, str(issues))
-
-        # 6. ...and catches a tampered log, a tampered body, and the ledger link
-        with open(att2["payload"]["stderr"]["path"], "w", encoding="utf-8") as f:
-            f.write("all good actually")
-        ok, issues = verify_attestation(path2)
-        check("verify_catches_tampered_log",
-              not ok and any("modified since capture" in i for i in issues), str(issues))
-
-        with open(path2, encoding="utf-8") as f:
-            forged = json.load(f)
-        forged["payload"]["exit_code"] = 0
-        forged["payload"]["verdict"] = "EVIDENCED"
-        with open(path2, "w", encoding="utf-8") as f:
-            json.dump(forged, f)
-        ok, issues = verify_attestation(path2)
-        check("verify_catches_forged_verdict",
-              not ok and any("digest mismatch" in i for i in issues), str(issues))
-
-        _checked, ledger_problems = verify_ledger_references(ledger)
-        check("verify_catches_broken_ledger_reference",
-              any("was edited after the ledger row" in p for p in ledger_problems),
-              str(ledger_problems))
-
-        # 6b. a DISPROVEN row hand-edited back to EVIDENCED is caught
-        att5, path5, _ = run_and_attest(
-            "P2", [sys.executable, "-c", "import sys; sys.exit(4)"],
-            ledger=ledger, attest_dir=attest_dir, quiet=True)
-        update_ledger(ledger, "P2", att5["payload"]["verdict"],
-                      evidence_sentence(att5["payload"], path5, att5["digest"]["value"]))
-        update_ledger(ledger, "P2", "EVIDENCED", _row_status(ledger, "P2")[1])
-        _checked, ledger_problems = verify_ledger_references(ledger)
-        check("verify_catches_status_laundering",
-              any("hand-edited away from the captured result" in p
-                  for p in ledger_problems), str(ledger_problems))
-
-        # 6c. rewriting the captured sentence is caught; appending notes is not
-        att6, path6, _ = run_and_attest(
-            "P1", [sys.executable, "-c", "print('nominal run')"],
-            ledger=ledger, attest_dir=attest_dir, quiet=True)
-        captured = evidence_sentence(att6["payload"], path6, att6["digest"]["value"])
-        update_ledger(ledger, "P1", "EVIDENCED", captured + " — reviewed by wina")
-        _checked, ledger_problems = verify_ledger_references(ledger)
-        check("appending_a_note_is_allowed",
-              not any("row P1" in p for p in ledger_problems), str(ledger_problems))
-        update_ledger(ledger, "P1", "EVIDENCED",
-                      captured.replace("nominal run", "everything is fine"))
-        _checked, ledger_problems = verify_ledger_references(ledger)
-        check("verify_catches_rewritten_evidence",
-              any("evidence text was rewritten" in p for p in ledger_problems),
-              str(ledger_problems))
-
-        # 6d. options may follow the claim id; only what is after `--` is the gate
-        rc = main(["prove", "P1", "--ledger", ledger, "--attest-dir", attest_dir,
-                   "--", sys.executable, "-c", "print('flags parsed')"])
-        check("options_after_claim_id_are_not_swallowed", rc == 0, f"rc={rc}")
-
-        # 7. signing round-trip, and detection of a wrong key
+    with tempfile.TemporaryDirectory(prefix="wincreator-selftest-") as directory:
+        ledger = os.path.join(directory, "PROOF_LEDGER.md")
+        Path(ledger).write_text(
+            "| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n"
+            "|----|-------|-------|------------------------|--------|----------|\n"
+            "| P1 | Micro | command succeeds | `python -c pass` | CLAIMED | |\n",
+            encoding="utf-8",
+        )
+        attestation, path, code = run_and_attest(
+            "P1",
+            [sys.executable, "-c", "print('ok')"],
+            ledger=ledger,
+            attest_dir=os.path.join(directory, "attestations"),
+            cwd=directory,
+            quiet=True,
+            tier="standard",
+        )
+        check("capture_pass", code == 0 and attestation["payload"]["capture"]["status"] == "CAPTURED_PASS")
+        check("review_required", read_claim(ledger, "P1")["status"] == "PENDING")
+        review_attestation(path, "EVIDENCED", "skeptic", ledger)
+        check("review_evidenced", read_claim(ledger, "P1")["status"] == "EVIDENCED")
+        _checked, problems = verify_ledger_references(ledger)
+        check("verify_round_trip", not problems)
+        saved_key = os.environ.get(SIGNING_KEY_ENV)
         os.environ[SIGNING_KEY_ENV] = "self-test-key"
-        att4, path4, _ = run_and_attest("P1", [sys.executable, "-c", "print('signed')"],
-                                        ledger=None, attest_dir=attest_dir, quiet=True)
-        check("attestation_signed_when_key_set", "signature" in att4)
-        ok, issues = verify_attestation(path4)
-        check("signature_verifies_with_right_key", ok, str(issues))
-        os.environ[SIGNING_KEY_ENV] = "another-key"
-        ok, issues = verify_attestation(path4)
-        check("signature_fails_with_wrong_key",
-              not ok and any("signature mismatch" in i for i in issues), str(issues))
-
-        # 8. a claim id absent from the ledger must not silently pass
         try:
-            update_ledger(ledger, "NOPE", "EVIDENCED", "x")
-            check("unknown_claim_id_raises", False)
-        except KeyError:
-            check("unknown_claim_id_raises", True)
-    finally:
-        os.chdir(old_cwd)
-        if old_key is None:
-            os.environ.pop(SIGNING_KEY_ENV, None)
-        else:
-            os.environ[SIGNING_KEY_ENV] = old_key
-        shutil.rmtree(workdir, ignore_errors=True)
+            signed, signed_path, signed_code = run_and_attest(
+                "NOLEDGER",
+                [sys.executable, "-c", "import os,sys; sys.exit(bool(os.getenv('WINCREATOR_SIGNING_KEY')))"],
+                ledger=None,
+                attest_dir=os.path.join(directory, "signed"),
+                cwd=directory,
+                quiet=True,
+                tier="lite",
+            )
+            check("key_hidden_from_gate", signed_code == 0)
+            check("capture_signed_after_gate", "signature" in signed)
+        finally:
+            if saved_key is None:
+                os.environ.pop(SIGNING_KEY_ENV, None)
+            else:
+                os.environ[SIGNING_KEY_ENV] = saved_key
+    for name, passed in results:
+        print(f"  [{'PASS' if passed else 'FAIL'}] {name}")
+    passed = sum(value for _name, value in results)
+    print(f"self-test: {passed}/{len(results)} passed")
+    return 0 if passed == len(results) else 2
 
-    failed = 0
-    for name, ok, detail in results:
-        if not ok:
-            failed += 1
-        print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" ({detail})" if detail and not ok else ""))
-    print(f"self-test: {len(results)-failed}/{len(results)} passed")
-    return 2 if failed else 0
 
-
-# ------------------------------------------------------------------- parser
 def build_parser():
-    parser = argparse.ArgumentParser(
-        prog="wincreator", description="capture proof instead of narrating it")
+    parser = argparse.ArgumentParser(prog="wincreator")
     parser.add_argument("--version", action="version", version=f"wincreator {VERSION}")
-    parser.add_argument("--self-test", action="store_true",
-                        help="run the embedded adversarial suite")
-    sub = parser.add_subparsers(dest="cmd")
+    parser.add_argument("--self-test", action="store_true")
+    subparsers = parser.add_subparsers(dest="command_name")
 
-    prove = sub.add_parser("prove", help="run a gate and attest its result")
-    prove.add_argument("claim_id", help="the ledger row ID to update, e.g. P-014")
+    prove = subparsers.add_parser("prove", help="execute and capture a claim gate")
+    prove.add_argument("claim_id")
     prove.add_argument("--ledger", default=DEFAULT_LEDGER)
-    prove.add_argument("--no-ledger", action="store_true",
-                       help="attest only, do not touch any ledger")
-    prove.add_argument("--file", action="append", default=[],
-                       help="hash this file into the attestation (repeatable)")
+    prove.add_argument("--no-ledger", action="store_true")
+    prove.add_argument("--file", action="append", default=[])
+    prove.add_argument("--optional-file", action="append", default=[])
     prove.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
-    prove.add_argument("--timeout", type=int, default=None)
-    prove.add_argument("command", nargs="*",
-                       help="-- followed by the command to execute")
+    prove.add_argument("--timeout", type=float)
+    prove.add_argument("--tier", choices=("lite", "standard", "regulated"), default="standard")
+    prove.add_argument("--builder")
+    prove.add_argument("--allow-dirty", action="store_true")
+    prove.add_argument("--auto-approve-lite", action="store_true")
+    prove.add_argument("--redact", action="append", default=[])
+    prove.add_argument("--redact-regex", action="append", default=[])
+    prove.add_argument("--max-output-bytes", type=int, default=DEFAULT_MAX_OUTPUT_BYTES)
+    prove.add_argument("--no-output-body", action="store_true")
+    prove.add_argument("--private", action="store_true")
+    prove.add_argument("gate", nargs="*")
 
-    verify = sub.add_parser("verify", help="re-hash attestations and their artifacts")
+    review = subparsers.add_parser("review", help="review a captured gate")
+    review.add_argument("claim_id")
+    review.add_argument("--verdict", required=True, choices=("evidenced", "insufficient", "disproven"))
+    review.add_argument("--reviewer", required=True)
+    review.add_argument("--attestation")
+    review.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
+    review.add_argument("--ledger", default=DEFAULT_LEDGER)
+    review.add_argument("--no-ledger", action="store_true")
+
+    verify = subparsers.add_parser("verify", help="verify captures, reviews, and ledger bindings")
     verify.add_argument("attestations", nargs="*")
     verify.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
-    verify.add_argument("--ledger", default=None,
-                        help="also check every attestation referenced by this ledger")
+    verify.add_argument("--ledger")
     return parser
 
 
-def main(argv):
-    parser = build_parser()
-    # Everything after the first bare `--` is the gate, verbatim; everything
-    # before it is ours. Splitting before argparse is what lets the gate keep
-    # its own flags (`pytest -q --tb=short`) without them being read as
-    # wincreator's, in either order.
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
     gate = None
     if "--" in argv:
-        cut = argv.index("--")
-        argv, gate = argv[:cut], argv[cut + 1:]
+        separator = argv.index("--")
+        argv, gate = argv[:separator], argv[separator + 1 :]
+    parser = build_parser()
     args = parser.parse_args(argv)
-    if gate is not None and getattr(args, "cmd", None) == "prove":
-        args.command = gate
     if args.self_test:
         return self_test()
-    if args.cmd == "prove":
-        if args.command and args.command[0] == "--":
-            args.command = args.command[1:]
+    if args.command_name == "prove":
+        args.command = gate if gate is not None else args.gate
         return cmd_prove(args)
-    if args.cmd == "verify":
+    if args.command_name == "review":
+        return cmd_review(args)
+    if args.command_name == "verify":
         return cmd_verify(args)
     parser.print_help()
     return 2
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

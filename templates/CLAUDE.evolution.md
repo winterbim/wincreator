@@ -14,7 +14,7 @@ self-improvement circuit there. Paths assume the skill is installed at
 ### Loop files (this project)
 
 - Mechanical gate: `python3 ~/.claude/skills/wincreator/scripts/ledger_check.py`
-  (run `--self-test` before trusting the gate; expect `20/20 passed`).
+  (run `--self-test` before trusting the gate; expect `36/36 passed`).
 - Proposals queue: `./EVOLUTION_QUEUE.md` (project root).
 - Live catches (written by the retro-analyst): `./SKEPTIC_CATCHES.md` (project root).
 
@@ -35,4 +35,4 @@ A fresh project has no project catches yet, so
 `ledger_check.py --catches ./SKEPTIC_CATCHES.md` returns **STALE, exit 1** —
 this is the **expected** state, not a broken install. That gate only becomes
 meaningful after the first real loops feed the log. The single install
-smoke test is `--self-test` (expect `20/20 passed`, exit 0).
+smoke test is `--self-test` (expect `36/36 passed`, exit 0).

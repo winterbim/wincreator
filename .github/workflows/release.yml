@@ -1,0 +1,94 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Bind tag, workflow SHA, and default branch
+        run: |
+          tag_commit="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          test "$GITHUB_SHA" = "$tag_commit"
+          git fetch origin master
+          git merge-base --is-ancestor "$tag_commit" origin/master
+          python tools/release_policy.py \
+            --expected-tag "$GITHUB_REF_NAME" \
+            --workflow-sha "$GITHUB_SHA" \
+            --tag-commit "$tag_commit" \
+            --default-branch-head "$(git rev-parse origin/master)" \
+            --default-branch-contains-tag true
+      - name: Re-run release gates
+        run: |
+          python -m pip install --disable-pip-version-check pytest==8.3.5 jsonschema==4.23.0
+          python tools/run_release_gate.py
+      - name: Capture a clean-tree release attestation
+        run: |
+          cp PROOF_LEDGER-v3-proof-capture.md "$RUNNER_TEMP/release-ledger.md"
+          python skill/wincreator/scripts/wincreator.py prove V3-07 \
+            --ledger "$RUNNER_TEMP/release-ledger.md" \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --tier regulated \
+            --builder github-actions-builder \
+            -- python tools/run_release_gate.py
+          python skill/wincreator/scripts/wincreator.py review V3-07 \
+            --ledger "$RUNNER_TEMP/release-ledger.md" \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --verdict evidenced \
+            --reviewer github-actions-skeptic
+          python skill/wincreator/scripts/wincreator.py verify \
+            --attest-dir "$RUNNER_TEMP/attestations" \
+            --ledger "$RUNNER_TEMP/release-ledger.md"
+          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/dist/wincreator-attestations.zip" attestations release-ledger.md)
+          (cd dist && sha256sum wincreator-attestations.zip > wincreator-attestations.zip.sha256)
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=(
+            dist/skill.zip
+            dist/skill.zip.sha256
+            dist/wincreator.skill
+            dist/wincreator.skill.sha256
+            dist/wincreator-attestations.zip
+            dist/wincreator-attestations.zip.sha256
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --title "WinCreator ${GITHUB_REF_NAME#v}" \
+              --notes-file RELEASE_NOTES.md \
+              --draft=false \
+              --prerelease=false \
+              --latest
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag \
+              --title "WinCreator ${GITHUB_REF_NAME#v}" \
+              --notes-file RELEASE_NOTES.md \
+              --latest
+          fi
+          latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          python tools/release_policy.py \
+            --expected-tag "$GITHUB_REF_NAME" \
+            --workflow-sha "$GITHUB_SHA" \
+            --tag-commit "$(git rev-parse "${GITHUB_REF_NAME}^{commit}")" \
+            --default-branch-head "$(git rev-parse origin/master)" \
+            --default-branch-contains-tag true \
+            --latest-tag "$latest_tag"
+          python tools/deprecate_old_releases.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --current-tag "$GITHUB_REF_NAME"

@@ -4,32 +4,32 @@ All notable changes to WinCreator are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Repository releases and the skill version are the same number from v3.0.0
-on: the frontmatter of `skill/wincreator/SKILL.md`,
-`skill/wincreator/CHANGELOG.md`, this file, the git tag and the release
-asset all say the same thing. Releases 2.0.0–2.5.0 existed only in the
-skill's own changelog; they are listed there and are not restated here.
+The package version lives in `skill/wincreator/VERSION`; official Skill
+frontmatter intentionally contains only `name` and `description`. A tag or
+release is authoritative only after it exists on GitHub. The v2 development
+history remains available in Git and is not restated here.
 
 ## [3.0.0] — 2026-08-02
 
-Proof capture. WinCreator stops trusting the agent's account of a gate and
-starts executing it: `wincreator prove` runs the command, captures the raw
-output, hashes it, binds it to the commit and writes the ledger row itself.
-Answers the external audit of 2026-08-02 point by point.
+Claim-bound capture and independent review. `wincreator prove` executes a
+gate and records `CAPTURED_*`; `wincreator review` separately decides whether
+the result is `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`.
 
 ### Added
-- `skill/wincreator/scripts/wincreator.py` — `prove` (capture: exit code,
-  stdout/stderr sha256, artifact hashes, git commit/branch/dirty/remote,
-  environment, canonical digest, optional HMAC-SHA256 signature) and
-  `verify` (re-hash everything, cross-check the ledger). A failing gate is
-  written `DISPROVEN`; `EVIDENCED` for a non-zero exit code is unreachable.
-- `skill/wincreator/scripts/package_check.py` — validates the Agent Skills
-  packaging in CI.
+- `wincreator.py prove/review/verify`: exact claim/gate binding, review
+  attestations, signing-key isolation, clean-tree Regulated policy, atomic
+  ledger updates, duplicate rejection, collision-safe captures, redaction,
+  output limits, private mode, and mandatory evidence files.
+- `schemas/attestation-v1.schema.json`, external pytest suite, and safe v2→v3
+  migration tool.
+- Deterministic `skill.zip` plus byte-identical `wincreator.skill`.
+- 12-job Ubuntu/Windows/macOS × Python 3.10–3.13 test matrix and pinned
+  official Skill validators.
 - `skill/wincreator/agents/openai.yaml` and
   `skill/wincreator/references/attestation.md`.
 - Statuses `DISPROVEN`, `SUPERSEDED`, `BLOCKED`; `--strict-attestation`.
-- `PROOF_LEDGER-v3-proof-capture.md` — the ledger of this release, with
-  rows written by `wincreator prove` rather than by hand.
+- `PROOF_LEDGER-v3-proof-capture.md` — separates locally observed results
+  from GitHub publication claims that remain PENDING/BLOCKED until observed.
 
 ### Changed
 - Skill package renamed `skill/Skill_WinCreator/` → `skill/wincreator/`
@@ -37,9 +37,8 @@ Answers the external audit of 2026-08-02 point by point.
   Update any local install: `~/.claude/skills/wincreator`.
 - Per-status evidence rules replace the single shared marker; a bare date
   or a bare URL no longer passes as an execution trace.
-- CI (`.github/workflows/ledger.yml`) now compiles the scripts, runs all
-  three self-tests and the package check *before* grading any ledger, then
-  checks every ledger in the repo plus `--catches`.
+- CI moved to `.github/workflows/ci.yml`; `.github/workflows/release.yml`
+  binds the tag commit to `GITHUB_SHA` before publishing assets.
 - README: the obsolete "91 lines" claim is gone, the demo outputs are real
   v3 runs, installation paths updated, license/attribution wording aligned
   with MIT (attribution is a request, not an added condition).

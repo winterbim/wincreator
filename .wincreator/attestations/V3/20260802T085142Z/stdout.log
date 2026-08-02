@@ -1,7 +1,0 @@
-  [PASS] valid_package_passes (expected valid, got 0)
-  [PASS] name_directory_mismatch_caught (expected problems, got 1)
-  [PASS] uppercase_name_caught (expected problems, got 1)
-  [PASS] missing_openai_yaml_caught (expected problems, got 1)
-  [PASS] incomplete_openai_yaml_caught (expected problems, got 1)
-  [PASS] broken_reference_caught (expected problems, got 2)
-self-test: 6/6 passed

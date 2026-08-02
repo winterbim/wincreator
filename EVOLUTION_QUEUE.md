@@ -144,20 +144,19 @@ QUEUED → APPLIED (version, date) | REJECTED (motif).
 - **Cible** : `scripts/` (nouveau `wincreator.py`, nouveau `package_check.py`,
   `ledger_check.py` v3), `SKILL.md`, `references/`, CI, README, changelogs.
 - **Patch appliqué** :
-  - `wincreator prove <ID> -- <cmd>` exécute la gate et ÉCRIT la ligne à partir
-    du code retour, des hashes stdout/stderr, du commit et d'une attestation
-    JSON signable ; `verify` re-calcule tout et détecte log falsifié, verdict
-    forgé, statut blanchi et phrase de preuve réécrite.
+  - `wincreator prove <ID> -- <cmd>` capture `CAPTURED_*`; `review` produit un
+    verdict épistémique séparé et `verify` lie ID, niveau, Claim, Gate, logs,
+    fichiers, attestation et review.
   - Statuts `DISPROVEN` (bloquant), `SUPERSEDED`, `BLOCKED`.
   - Une règle d'évidence PAR statut, à la place du marqueur commun.
   - `package_check.py` : l'emballage devient une gate, exécutée en CI.
   - Trois niveaux Lite/Standard/Regulated + déclenchement resserré (l'audit
     signalait un skill qui se déclenchait sur presque toute tâche technique).
-- **Test de véracité** : self-tests 20→36 (ledger_check), 25 nouveaux cas
-  (wincreator.py, dont `failing_gate_never_evidenced`), 6 (package_check) ;
+- **Test de véracité** : 36 self-tests ledger, self-tests capture/package et
+  suite pytest externe adversariale multiplateforme ;
   les 3 ledgers historiques repassent sous les règles v3 sans qu'aucune règle
   n'ait été relâchée ; `PROOF_LEDGER-v3-proof-capture.md` est rempli par la
-  capture, pas à la main.
+  distingue les preuves locales des gates de publication encore bloquées.
 - **Limite assumée** : l'attestation est tamper-*evident*, pas tamper-*proof*
   (HMAC = possession de clé). Consignée en ligne V13 `BLOCKED` du ledger v3,
   dépendance externe nommée (Sigstore / in-toto + log de transparence).

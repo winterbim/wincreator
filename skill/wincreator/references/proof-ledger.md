@@ -32,6 +32,10 @@ Two statuses block a loop from reporting done: `CLAIMED` and `DISPROVEN`.
 - `DISPROVEN` — the gate ran and the claim turned out **false**. Same
   evidence requirement as EVIDENCED: a negative result is a result, and it
   is kept. Blocking, because a false claim is not a finished loop.
+- `INSUFFICIENT` — an independent review inspected the capture but found that
+  it does not prove the claim. The Evidence cell must link the review verdict,
+  reviewer, and timestamp. This blocks completion until better evidence is
+  captured and reviewed.
 - `PENDING` — the proof is defined but cannot be executed in the current
   context (no execution tool; runs on the developer's machine). The Evidence
   cell must contain the exact command handed to the developer.
@@ -50,8 +54,9 @@ Two statuses block a loop from reporting done: `CLAIMED` and `DISPROVEN`.
 1. Only the Skeptic role writes or changes a Status (see
    `references/agents.md`).
 2. Statuses only move forward within a loop: CLAIMED → (EVIDENCED |
-   DISPROVEN | PENDING | BLOCKED | WAIVED). A PENDING or BLOCKED row becomes
-   EVIDENCED only when the raw result arrives and is inspected.
+   DISPROVEN | INSUFFICIENT | PENDING | BLOCKED | WAIVED). An INSUFFICIENT,
+   PENDING, or BLOCKED row becomes EVIDENCED only after adequate raw evidence
+   arrives and is inspected.
 3. If new evidence contradicts an EVIDENCED row (a regression), the row goes
    to DISPROVEN and the loop that owned it reopens. Never delete a DISPROVEN
    row and never quietly downgrade it: fix the thing and re-prove it, or
@@ -62,12 +67,12 @@ Two statuses block a loop from reporting done: `CLAIMED` and `DISPROVEN`.
    python scripts/ledger_check.py PROOF_LEDGER.md
    ```
 
-   Exit code 0 = ledger clean (no CLAIMED or DISPROVEN rows, every row
-   carrying what its status requires). Non-zero = the loop is not allowed to
-   report "done". This is deliberately CI-friendly: add it to your pipeline
-   if you have one. `--strict-attestation` additionally requires every
-   EVIDENCED/DISPROVEN row to cite a captured attestation — the Regulated
-   tier.
+   Exit code 0 = ledger clean (no CLAIMED, DISPROVEN, or INSUFFICIENT rows,
+   every row carrying what its status requires). Non-zero = the loop is not
+   allowed to report "done". This is deliberately CI-friendly: add it to your
+   pipeline if you have one. `--strict-attestation` additionally requires
+   every EVIDENCED/DISPROVEN row to cite a captured attestation — the
+   Regulated tier.
 
 5. Whenever the gate is a command you can actually run, do not write the
    Evidence cell at all — capture it:
@@ -125,7 +130,8 @@ successor, BLOCKED a named blocker and a date.
 
 These remain structural proxies, honestly limited: they check the required
 element is present, not that it is faithful — that stays the Skeptic's job,
-unless the row was produced by `wincreator prove`, in which case the exit
+unless the row was produced by `wincreator prove` and, for Standard or
+Regulated work, independently accepted by `wincreator review`, in which case the exit
 code and the hashes carry it instead. Since v2.3 (EVO-003), `--catches` is schema-gated
 the same way the ledger parser is: only rows under a real catches header
 (`Date | Class(e)…`) count, so a foreign table with an ISO date no longer

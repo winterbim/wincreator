@@ -43,6 +43,8 @@ v3.0 EVO-006/007/008 (breaking: the status set and the evidence rules change):
   G. --strict-attestation (Regulated tier): every EVIDENCED/DISPROVEN row must
      reference a `wincreator prove` attestation (path + sha256), i.e. machine-
      captured evidence rather than a hand-written sentence.
+  H. INSUFFICIENT is a first-class blocking status. It cannot be collapsed
+     into the non-blocking PENDING state after an independent review.
 
 Usage:
     python ledger_check.py [PROOF_LEDGER.md]     (default: PROOF_LEDGER.md)
@@ -60,10 +62,10 @@ VERSION = "3.0.0"
 # Statuses that may legitimately appear in a ledger.
 VALID_STATUSES = {
     "CLAIMED", "EVIDENCED", "PENDING", "WAIVED",
-    "DISPROVEN", "SUPERSEDED", "BLOCKED",
+    "DISPROVEN", "INSUFFICIENT", "SUPERSEDED", "BLOCKED",
 }
 # Statuses that forbid a loop from reporting "done".
-BLOCKING_STATUSES = {"CLAIMED", "DISPROVEN"}
+BLOCKING_STATUSES = {"CLAIMED", "DISPROVEN", "INSUFFICIENT"}
 MIN_EVIDENCE_LEN = 10
 EXPECTED_HEADER = ["id", "level", "claim", "gate", "status", "evidence"]
 
@@ -307,6 +309,16 @@ def check_text(text, label="ledger", strict_attestation=False):
                 f"{prefix}: BLOCKED but Evidence does not name a dated external "
                 f"blocker (spec: 'blocked by <dependency>, <date>'): "
                 f"'{evidence[:60]}'")
+        if status_u == "INSUFFICIENT":
+            if not ("verdict=INSUFFICIENT" in evidence
+                    and "reviewer=" in evidence
+                    and "reviewed_at=" in evidence):
+                violations.append(
+                    f"{prefix}: INSUFFICIENT without a linked review verdict, "
+                    f"reviewer, and timestamp: '{evidence[:60]}'")
+            violations.append(
+                f"{prefix}: INSUFFICIENT — independent review found the evidence "
+                f"insufficient; the loop may not report done. Claim: {claim[:60]}")
         if status_u == "DISPROVEN":
             # A negative result is a first-class, retained record — and it still
             # forbids reporting done. Retire it via SUPERSEDED once the claim is
@@ -425,6 +437,12 @@ SELF_TESTS = [
      "| P4 | Micro | perf ok | bench | PENDING | we will get to it later, promise it is fine |\n", True),
     ("pending_with_command_still_ok", HDR +
      "| P4 | Micro | perf ok | bench | PENDING | command given: `cargo test parser::malformed` |\n", False),
+    ("insufficient_review_blocks_done", HDR +
+     "| P4 | Micro | perf ok | bench | INSUFFICIENT | attestation.json exit=0; "
+     "review review.json verdict=INSUFFICIENT reviewer=skeptic reviewed_at=2026-08-02T12:00:00Z "
+     "sha256=0123456789abcdef |\n", True),
+    ("insufficient_without_review_metadata_caught", HDR +
+     "| P4 | Micro | perf ok | bench | INSUFFICIENT | more proof would be useful here |\n", True),
     ("waived_no_date_caught", HDR +
      "| P5 | Micro | perf | bench | WAIVED | user said just skip it for now, no need to bother |\n", True),
     ("waived_with_date_ok", HDR +
@@ -543,6 +561,9 @@ def self_test():
 
 def main(argv):
     args = list(argv)
+    if args and args[0] in {"--help", "-h"}:
+        print(__doc__.strip())
+        return 0
     if args and args[0] == "--self-test":
         return self_test()
     if args and args[0] == "--version":
