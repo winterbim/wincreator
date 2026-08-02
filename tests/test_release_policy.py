@@ -107,6 +107,16 @@ def test_release_workflow_is_read_only_until_publish_step():
     assert "--file dist/skill.zip" in ci_workflow
 
 
+def test_official_validator_dependencies_are_installed_before_validation():
+    workflow = (REPO / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    dependency = "PyYAML==6.0.3"
+    validator = "quick_validate.py"
+    assert dependency in workflow
+    assert workflow.index(dependency) < workflow.index(validator)
+
+
 def test_latest_release_must_match_expected_tag(release_policy):
     problems = release_policy.validate_release_state(
         expected_tag="v3.0.0",

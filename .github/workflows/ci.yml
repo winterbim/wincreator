@@ -71,6 +71,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install OpenAI validator dependencies
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
       - name: Fetch pinned OpenAI Skill Creator
         run: |
           git init "$RUNNER_TEMP/openai-skills"
