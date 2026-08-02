@@ -1,0 +1,19 @@
+# Proof Ledger — WinCreator v3 release candidate
+
+This ledger distinguishes local implementation evidence from publication
+evidence. Publication claims remain `PENDING` or `BLOCKED` until GitHub
+Actions, merge, tag, release, and clean public-install checks actually occur.
+No old dirty-tree attestation is treated as release evidence.
+
+| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
+|----|-------|-------|------------------------|--------|----------|
+| V3-01 | Micro | the current tree exposes exactly one installable Skill entry point at `skill/wincreator/SKILL.md` | `find . -name SKILL.md -not -path './.git/*' -print` | EVIDENCED | 2026-08-02 command `find . -name SKILL.md -not -path './.git/*' -print` exit=0; raw result: `./skill/wincreator/SKILL.md` |
+| V3-02 | Micro | SKILL.md and agents/openai.yaml pass the validators available from the official OpenAI Skill Creator and Agent Skills reference implementation | OpenAI `quick_validate.py skill/wincreator` and `npx --yes skills-ref@0.1.5 validate skill/wincreator` | EVIDENCED | 2026-08-02 both named commands exit=0; raw results: `Skill is valid!` and `Valid skill: skill/wincreator` |
+| V3-03 | Meso | the external adversarial suite covers claim/gate tampering, review separation, security, concurrency, redaction, migration, portability, packaging and release-state contradictions | `python3 -m pytest -q` | EVIDENCED | 2026-08-02 command `python3 -m pytest -q` exit=0; raw result: `62 passed in 1.96s` |
+| V3-04 | Micro | the capture layer self-test proves review is required, round-trip verification works, and the HMAC key is hidden from the gate | `python3 skill/wincreator/scripts/wincreator.py --self-test` | EVIDENCED | 2026-08-02 named command exit=0; raw result: `self-test: 6/6 passed` |
+| V3-05 | Micro | the release package is reproducible and `skill.zip` is byte-identical to `wincreator.skill` | two `./tools/build_package.sh` runs plus `sha256sum` and `cmp` | EVIDENCED | 2026-08-02 named commands exit=0; raw SHA-256 for both aliases and both independent builds: `90bfdf6501ee834ae3a4512d4e5e91ac3afa342e5d8e464b952f76be7889f6db` |
+| V3-06 | Meso | all 12 Linux/Windows/macOS × Python 3.10–3.13 matrix jobs and official package validation are green on the final PR commit | `gh pr checks 4 --watch` | PENDING | command pending: `gh pr checks 4 --watch`; run 30746309723 passed every job on the prior head, but the final commit now includes the downloaded-attestation portability fix and requires a fresh complete run |
+| V3-07 | Micro | final Regulated release attestations bind the clean final commit and tree | `git status --porcelain` then CI `wincreator prove --tier regulated` and `wincreator verify` | PENDING | command pending: `git status --porcelain && python3 skill/wincreator/scripts/wincreator.py verify --ledger PROOF_LEDGER-v3-proof-capture.md`; final commit does not yet exist |
+| V3-08 | Macro | PR #4 is independently reviewed, merged, tagged v3.0.0, and published as the latest GitHub release | `gh pr view 4`, `git rev-parse v3.0.0^{commit}`, and `gh release view v3.0.0` | BLOCKED | blocked by the absence of an independent GitHub approval on 2026-08-02; no merge, tag, or release is claimed |
+| V3-09 | Meso | `npx skills add winterbim/wincreator` installs only v3 from a virgin HOME | run the public `npx skills add` command after merge | PENDING | command pending: `npx skills add winterbim/wincreator`; testing before default-branch merge would install the old public tree and cannot evidence v3 |
+| V3-10 | Meso | a clean public clone at the release tag passes the absolute final gate | clone public v3 and run every command in the mission final gate | PENDING | command pending: `git clone https://github.com/winterbim/wincreator.git && git describe --tags --exact-match && python3 -m pytest -q`; requires the real published tag |

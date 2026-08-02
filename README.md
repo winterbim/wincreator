@@ -1,200 +1,226 @@
 # WinCreator
 
-Your agent says "done, tested." Can you prove it — six months from now,
-to someone who wasn't in the conversation? Most agent sessions can't: the
-same context that wrote the code also graded it, the constraints from
-message one are long gone by message forty, and a failing check gets
-re-attacked at the same level, forever.
+WinCreator structures consequential engineering work as proof-gated loops.
+It keeps claims in a Markdown ledger, captures the command that tested each
+claim, and separates a mechanical command result from an independent review.
 
-**WinCreator turns any non-trivial engineering task into a hierarchy of
-verification-gated loops with an auditable Proof Ledger, Builder/Skeptic
-role separation, and a re-emitted loop state panel that survives long
-sessions.**
-
-[![ledger-check](https://github.com/winterbim/wincreator/actions/workflows/ledger.yml/badge.svg)](https://github.com/winterbim/wincreator/actions/workflows/ledger.yml)
+[![ci — default branch](https://github.com/winterbim/wincreator/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/winterbim/wincreator/actions/workflows/ci.yml?query=branch%3Amaster)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Works with](https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-6e56cf)](#installation)
-[![Sponsor](https://img.shields.io/badge/sponsor-buymeacoffee-orange)](https://buymeacoffee.com/wintfernanh)
 
-## 30-second demo
+The CI badge reports the default branch only. It is not evidence that an open
+pull request is green; use that PR's checks for the PR state.
 
-The mechanical gate is `scripts/ledger_check.py` — stdlib-only, no
-dependencies. It parses a `PROOF_LEDGER.md` table and refuses to exit 0 if
-any claim is unproven. Below is a real run, not a mockup.
+## What changed in v3
 
-Save this exact table as `PROOF_LEDGER_dirty.md` — one unproven claim, one
-rubber-stamped one:
+Earlier versions could validate a sentence about a proof. v3 captures the
+process that ran the gate and binds it to the exact claim:
+
+- exactly one installable Skill: `skill/wincreator/SKILL.md`;
+- official frontmatter containing only `name` and `description`;
+- current `agents/openai.yaml` interface metadata;
+- `CAPTURED_PASS`, `CAPTURED_FAIL`, and `CAPTURE_ERROR` separated from
+  `EVIDENCED`, `INSUFFICIENT`, and `DISPROVEN` review verdicts;
+- claim ID, level, text, gate, row digest, and pre-capture ledger digest in
+  every attestation;
+- atomic, locked ledger writes and duplicate-ID rejection;
+- mandatory `--file`, explicit `--optional-file`, collision-safe run IDs;
+- clean-tree enforcement for Regulated captures;
+- output redaction, size limits, body suppression, and private captures;
+- deterministic `skill.zip` and byte-identical `wincreator.skill` packages;
+- Linux, Windows, and macOS CI across Python 3.10–3.13.
+
+The version is stored in `skill/wincreator/VERSION`, not in SKILL.md
+frontmatter.
+
+## Capture and review
+
+Given a ledger row:
 
 ```markdown
 | ID | Level | Claim | Gate (what proves it) | Status | Evidence |
 |----|-------|-------|------------------------|--------|----------|
-| P1 | Meso  | /export endpoint returns 200 for all active cases | Run full dataset, inspect status codes | EVIDENCED | run 2026-07-10: pytest -k export -> 14 passed |
-| P2 | Micro | parser rejects malformed input | unit test on truncated file | CLAIMED | |
-| P3 | Micro | CSV export matches DB row count | diff row counts after export | EVIDENCED | ok |
+| P2 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
 ```
 
-```
-$ python3 skill/Skill_WinCreator/scripts/ledger_check.py PROOF_LEDGER_dirty.md
-LEDGER NOT CLEAN — 2 violation(s):
-  ✗ line 4 [P2]: CLAIMED with no evidence — loop may not report done. Claim: parser rejects malformed input
-  ✗ line 5 [P3]: status EVIDENCED but Evidence cell is empty or too vague ('ok')
-exit=1
-```
+Capture the gate:
 
-Fix the two claims — real evidence, not "ok":
-
-```markdown
-| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
-|----|-------|-------|------------------------|--------|----------|
-| P1 | Meso  | /export endpoint returns 200 for all active cases | Run full dataset, inspect status codes | EVIDENCED | run 2026-07-10: pytest -k export -> 14 passed |
-| P2 | Micro | parser rejects malformed input | unit test on truncated file | EVIDENCED | pytest -k truncated_input -> 1 passed, AssertionError raised as expected |
-| P3 | Micro | CSV export matches DB row count | diff row counts after export | EVIDENCED | export.csv rows=482, SELECT COUNT(*) FROM cases=482, match |
+```bash
+python3 skill/wincreator/scripts/wincreator.py prove P2 \
+  --tier standard \
+  --builder builder-01 \
+  -- python3 check_parser.py
 ```
 
+An exit code of zero produces `CAPTURED_PASS` but leaves the ledger row
+`PENDING` until review. A non-zero exit produces `CAPTURED_FAIL` and records
+`DISPROVEN`; the CLI returns the gate's non-zero code.
+
+Review the capture:
+
+```bash
+python3 skill/wincreator/scripts/wincreator.py review P2 \
+  --verdict evidenced \
+  --reviewer skeptic-01
 ```
-$ python3 skill/Skill_WinCreator/scripts/ledger_check.py PROOF_LEDGER_clean.md
-LEDGER CLEAN — 3 row(s) verified in PROOF_LEDGER_clean.md
-exit=0
+
+Verify capture logs, attested files, review linkage, ledger status, and the
+unchanged claim/gate fields:
+
+```bash
+python3 skill/wincreator/scripts/wincreator.py verify \
+  --ledger PROOF_LEDGER.md
 ```
 
-That is the entire mechanism. No LLM call, no network, no config. A
-single stdlib-only Python script
-([`ledger_check.py`](skill/Skill_WinCreator/scripts/ledger_check.py), 91
-lines) stands between "the agent said it's done" and a merge.
+Lite work may opt into `--tier lite --auto-approve-lite`. Standard and
+Regulated work require a separate review. In Regulated mode the Git state must
+remain unchanged through the gate and the reviewer identifier must differ from
+the Builder. The CLI records `--automatic` reviews explicitly; authenticated
+human independence and approval must be enforced by the surrounding PR or
+compliance process. Standard captures outside Git should pass source inputs
+with `--file`; otherwise the CLI warns that no source snapshot is claim-bound.
 
-## The three failure modes
+## Sensitive data
 
-Every agent-assisted engineering session degrades the same three ways,
-and knowing them is the key to using this skill well.
+stdout, stderr, file paths, the working directory, hostname, username, and
+attested files may contain sensitive data. Apply controls before capture:
 
-1. **Optimism leak** — the same context that wrote the code grades its
-   own work, and "it should work" quietly becomes "it works".
-   Countermeasure: the Proof Ledger + Builder/Skeptic separation.
-   Whoever builds never grades their own gate; the Skeptic receives only
-   the claim, the gate, and the raw evidence — never the Builder's
-   reasoning, which contaminates judgment.
-2. **Context rot** — constraints stated early get lost as the session
-   grows; the agent drifts from the original need without noticing.
-   Countermeasure: the Loop Panel, a four-line state block re-emitted at
-   every gate event (gate announced, gate passed, gate failed, level
-   change), so the current truth survives even when session memory
-   degrades.
-3. **Stuck loops** — a failing check gets re-attacked at the same level
-   again and again, when the real defect lives one level up.
-   Countermeasure: the Two-Failure Rule — the same gate failing twice
-   forbids a third identical attempt and forces a level audit first
-   ("would this failure disappear if something one level up were
-   different?").
+```bash
+python3 skill/wincreator/scripts/wincreator.py prove P2 \
+  --redact "$TOKEN" \
+  --redact-regex 'password=[^ ]+' \
+  --max-output-bytes 1048576 \
+  --no-output-body \
+  --private \
+  -- python3 check_parser.py
+```
 
-## Real worked example
+Redaction happens before logs are written and hashes cover the retained,
+redacted bytes. Attestations record original and retained byte counts. The
+gate never inherits `WINCREATOR_SIGNING_KEY`; HMAC signing happens after it
+exits.
 
-[`skill/Skill_WinCreator/references/worked-example.md`](skill/Skill_WinCreator/references/worked-example.md)
-is a full transcript, not a fiction: a semver comparator with five green
-tests and a docstring promising `ValueError` on malformed input — a
-promise no test actually checked. The Skeptic pass caught the gap that
-"tests pass → done" would have shipped, and a sixth test closed it before
-the loop was allowed to report up.
+HMAC makes modifications detectable to someone holding the key. It is not a
+public signature or an independent transparency log, and a repository owner
+who also holds the key can rewrite history. Sigstore, Rekor, in-toto and full
+SLSA remain future work.
+
+## Package validation
+
+The internal policy checker deliberately makes only this claim:
+
+```bash
+python3 skill/wincreator/scripts/package_check.py skill/wincreator
+# WINCREATOR PACKAGE POLICY: PASS
+```
+
+Official validation is separate:
+
+```bash
+python3 /path/to/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py \
+  skill/wincreator
+npx --yes skills-ref@0.1.5 validate skill/wincreator
+```
+
+Build twice and compare the deterministic package:
+
+```bash
+./tools/build_package.sh dist/build-1
+./tools/build_package.sh dist/build-2
+sha256sum dist/build-1/skill.zip dist/build-2/skill.zip
+```
+
+Each output directory contains:
+
+```text
+skill.zip
+skill.zip.sha256
+wincreator.skill
+wincreator.skill.sha256
+```
+
+`skill.zip` and `wincreator.skill` are byte-identical aliases. Their only
+Skill entry is `wincreator/SKILL.md`, and the archive must remain below 25 MiB.
 
 ## Installation
 
-**Claude Code**
+These commands use only the v3 path and name. The GitHub release command is
+appropriate after `v3.0.0` is actually published; until then, do not treat
+`releases/latest` as proof of v3 availability.
 
-```
+### Git / Claude Code
+
+```bash
 git clone https://github.com/winterbim/wincreator.git
-cp -r wincreator/skill/Skill_WinCreator ~/.claude/skills/Skill_WinCreator
+mkdir -p ~/.claude/skills
+cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
+python3 ~/.claude/skills/wincreator/scripts/ledger_check.py --self-test
+python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
 ```
 
-**npx skills**
+### npx skills
 
-```
+```bash
 npx skills add winterbim/wincreator
 ```
 
-**Manual download**
+After installation, confirm that exactly one discovered SKILL.md has
+`name: wincreator` and that `VERSION` contains `3.0.0`.
 
-Download `Skill_WinCreator.skill` from the
-[latest release](https://github.com/winterbim/wincreator/releases/latest)
-and unzip it into your skills directory.
+### ChatGPT / manual package
 
-## This repo eats its own dogfood
+Build or download `skill.zip`, then upload that file. It contains a single
+root directory, `wincreator/`, and a single `SKILL.md`. The release asset is
+not considered official until the v3 tag and GitHub release exist and its
+checksum matches `skill.zip.sha256`.
 
-[`PROOF_LEDGER.md`](PROOF_LEDGER.md) at the repository root is not a
-sample — it is the real ledger for the act of publishing this repository:
-every claim made while shipping WinCreator (structure preserved
-unmodified, demo output real, no placeholder credentials committed,
-attribution consistent) is a row in that file, and
-`.github/workflows/ledger.yml` runs `ledger_check.py` against it on every
-push. The green badge at the top of this page is that check, live, not a
-static image — its
-[most recent run](https://github.com/winterbim/wincreator/actions/runs/29097155491)
-verified all rows in `PROOF_LEDGER.md` on GitHub's own runner.
+### Safe migration from v1/v2
 
-## Bootstrap the evolution loop in your own project
-
-The skill itself (doctrine + gate + `SKEPTIC_CATCHES.md`) travels in the
-`.skill` package. The *evolution circuit* that lets the skill improve itself
-— the `.claude/agents/`, the `CLAUDE.md` wiring, the proposals queue — is
-repository scaffolding, so it travels via `git clone`, not the single-file
-`.skill`. To run that circuit inside one of your own projects:
+The migration tool backs up known old installations, removes only those known
+directories, installs v3, runs the validators, and prints the active version:
 
 ```bash
-# sources: your clone of this repo, and wherever you installed the skill
-WINCREATOR=/path/to/wincreator                 # git clone of this repo
-SKILL=~/.claude/skills/Skill_WinCreator        # where you installed the skill
-
-cd /path/to/your/project
-
-# 1. the four evolution agents
-mkdir -p .claude/agents
-cp "$WINCREATOR"/.claude/agents/wincreator-*.md .claude/agents/
-
-# 2. APPEND the loop section to your CLAUDE.md — never overwrite; your project
-#    may already have one (bimwin does), and cat >> preserves it
-cat "$WINCREATOR"/templates/CLAUDE.evolution.md >> CLAUDE.md
-
-# 3. create the project-level queue and catches log (only if absent)
-[ -f EVOLUTION_QUEUE.md ] || printf '# Evolution Queue\n\n_(empty — awaiting the first retro-analyst pass)_\n' > EVOLUTION_QUEUE.md
-[ -f SKEPTIC_CATCHES.md ] || printf '# Skeptic Catches — project log\n\n| Date | Class | Why missed | Question that would have caught it |\n|------|-------|------------|-------------------------------------|\n' > SKEPTIC_CATCHES.md
-
-# 4. the ONLY install smoke test:
-python3 "$SKILL"/scripts/ledger_check.py --self-test     # -> self-test: 20/20 passed
+python3 tools/migrate_v2_to_v3.py
 ```
 
-Every command above was executed in a virgin directory before being
-published here (`PROOF_LEDGER-evolution.md`, cycle 4). Two things a fresh
-setup must know:
+The explicit manual equivalent is:
 
-- **`--catches` is STALE at day zero, and that is correct.** A new project
-  has no catches yet, so
-  `ledger_check.py --catches ./SKEPTIC_CATCHES.md` returns `CATCHES STALE`,
-  exit 1 — the expected state, not a broken install. That gate only becomes
-  meaningful after real loops feed the log. Use `--self-test` (not
-  `--catches`) as the install check.
-- **Two `SKEPTIC_CATCHES.md` can exist; the authority is decided.** The one
-  in `~/.claude/skills/Skill_WinCreator/` is read-only inherited heritage;
-  your project's `./SKEPTIC_CATCHES.md` is the live log the retro-analyst
-  writes. A Meso+ loop re-reads **both** at its start. The full rule is in
-  `templates/CLAUDE.evolution.md`, which step 2 appends to your `CLAUDE.md`.
+```bash
+rm -rf ~/.claude/skills/Skill_WinCreator
+rm -rf ~/.claude/skills/skill-wincreator
+cp -r skill/wincreator ~/.claude/skills/wincreator
+```
 
-## Support this project
+Prefer the migration tool when an old installation may contain user files.
 
-WinCreator is free and MIT-licensed. If it saved you from shipping an
-unverified "done," consider supporting its development:
-[buymeacoffee.com/wintfernanh](https://buymeacoffee.com/wintfernanh) ·
-[bimcheck-consulting.com](https://bimcheck-consulting.com)
+## Development gates
+
+```bash
+python3 -m compileall -q skill/wincreator/scripts tools tests
+python3 skill/wincreator/scripts/ledger_check.py --self-test
+python3 skill/wincreator/scripts/wincreator.py --self-test
+python3 skill/wincreator/scripts/package_check.py --self-test
+python3 -m pytest -q
+python3 skill/wincreator/scripts/package_check.py skill/wincreator
+./tools/build_package.sh
+```
+
+CI runs these gates on Ubuntu, Windows, and macOS with Python 3.10, 3.11,
+3.12, and 3.13, uploads a package from every matrix job, and runs the pinned
+OpenAI Skill Creator validator plus the pinned Agent Skills reference
+validator in a separate job.
+
+## Publication status
+
+The authoritative publication state is GitHub, not this paragraph:
+
+- default branch: <https://github.com/winterbim/wincreator>;
+- open PR checks: <https://github.com/winterbim/wincreator/pulls>;
+- latest release: <https://github.com/winterbim/wincreator/releases/latest>.
+
+Do not infer a v3 tag, release, assets, `latest` state, or successful public
+installation from the source tree alone. Those claims are evidenced only
+after the corresponding GitHub operations and clean-clone checks complete.
 
 ## License
 
 MIT — see [LICENSE](LICENSE). Copyright Winter Fernandes.
-
-If you use, fork, or build upon this skill, credit Winter Fernandes as
-the original creator with a link back to this repository. The MIT
-license already requires the copyright notice to be preserved; this line
-makes that expectation explicit and visible.
-
----
-
-Created by **Winter Fernandes** — BIMCheck Consulting
-[bimcheck-consulting.com](https://bimcheck-consulting.com)
-
-Attribution required in derivatives — see [NOTICE](NOTICE).

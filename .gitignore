@@ -8,3 +8,9 @@ PROMPT-wincreator-auto-evolution.md
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Built skill package (release asset, rebuilt by tools/build_package.sh)
+dist/
+
+# Runtime captures are retained as CI/release artifacts, not source files.
+.wincreator/

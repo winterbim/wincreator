@@ -1,0 +1,4 @@
+interface:
+  display_name: "WinCreator"
+  short_description: "Proof-gated engineering loops"
+  default_prompt: "Use $wincreator to structure this task with claim-bound capture and independent review."

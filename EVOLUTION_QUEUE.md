@@ -2,7 +2,7 @@
 
 Propositions d'évolution émises par `wincreator-retro-analyst` à partir de
 patterns confirmés (≥2 occurrences datées sur ≥2 tâches dans
-`skill/Skill_WinCreator/SKEPTIC_CATCHES.md`). Seul `wincreator-skill-surgeon`
+`skill/wincreator/SKEPTIC_CATCHES.md`). Seul `wincreator-skill-surgeon`
 applique une proposition, une boucle Meso à la fois, sous gate. Statuts :
 QUEUED → APPLIED (version, date) | REJECTED (motif).
 
@@ -128,6 +128,38 @@ QUEUED → APPLIED (version, date) | REJECTED (motif).
   peut ajouter de la fragilité à ses propres gates ne doit pas le faire sans
   raison prouvée.* La convergence ici n'est pas "plus de bugs" mais "ce défaut
   est intrinsèque à une gate structurelle ; le bon remède est écrit, pas codé".
+
+## EVO-007 — capturer la preuve au lieu de la raconter (audit externe 2026-08-02)
+
+- **Statut** : APPLIED (v3.0.0, 2026-08-02)
+- **Origine** : audit externe commandé par Winter, hors circuit interne. Waiver
+  explicite de l'utilisateur sur l'invariant « 4 statuts » (le passage à 7 est
+  demandé nommément dans l'audit).
+- **Pattern CONFIRMÉ** : *self-verification gap* — 3e récidive de la méta-classe
+  d'EVO-001/EVO-003, cette fois sur deux surfaces jamais gatées :
+  1. la prose du dépôt (claim « 91 lines » périmée depuis v2.1) ;
+  2. l'emballage Agent Skills (`name: skill-wincreator` dans `Skill_WinCreator/`).
+  Plus deux défauts de fond : marqueur générique partagé (PENDING satisfait par
+  une date nue) et absence de statut négatif.
+- **Cible** : `scripts/` (nouveau `wincreator.py`, nouveau `package_check.py`,
+  `ledger_check.py` v3), `SKILL.md`, `references/`, CI, README, changelogs.
+- **Patch appliqué** :
+  - `wincreator prove <ID> -- <cmd>` capture `CAPTURED_*`; `review` produit un
+    verdict épistémique séparé et `verify` lie ID, niveau, Claim, Gate, logs,
+    fichiers, attestation et review.
+  - Statuts `DISPROVEN` (bloquant), `SUPERSEDED`, `BLOCKED`.
+  - Une règle d'évidence PAR statut, à la place du marqueur commun.
+  - `package_check.py` : l'emballage devient une gate, exécutée en CI.
+  - Trois niveaux Lite/Standard/Regulated + déclenchement resserré (l'audit
+    signalait un skill qui se déclenchait sur presque toute tâche technique).
+- **Test de véracité** : 36 self-tests ledger, self-tests capture/package et
+  suite pytest externe adversariale multiplateforme ;
+  les 3 ledgers historiques repassent sous les règles v3 sans qu'aucune règle
+  n'ait été relâchée ; `PROOF_LEDGER-v3-proof-capture.md` est rempli par la
+  distingue les preuves locales des gates de publication encore bloquées.
+- **Limite assumée** : l'attestation est tamper-*evident*, pas tamper-*proof*
+  (HMAC = possession de clé). Consignée en ligne V13 `BLOCKED` du ledger v3,
+  dépendance externe nommée (Sigstore / in-toto + log de transparence).
 
 ## Différé (loggé, PAS opéré ce cycle — retenue délibérée)
 
