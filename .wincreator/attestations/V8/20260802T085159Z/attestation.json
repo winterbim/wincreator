@@ -1,0 +1,49 @@
+{
+  "payload": {
+    "schema": "wincreator.attestation/v1",
+    "tool_version": "3.0.0",
+    "claim_id": "V8",
+    "ledger": "PROOF_LEDGER-v3-proof-capture.md",
+    "verdict": "EVIDENCED",
+    "command": [
+      "bash",
+      "-c",
+      "if rg -n 'skill/Skill_WinCreator' README.md CONTRIBUTING.md CLAUDE.md NOTICE EVOLUTION_QUEUE.md templates .github skill tools; then echo 'stale path found'; exit 1; else echo 'no stale skill/Skill_WinCreator path in living files'; fi"
+    ],
+    "command_string": "bash -c if rg -n 'skill/Skill_WinCreator' README.md CONTRIBUTING.md CLAUDE.md NOTICE EVOLUTION_QUEUE.md templates .github skill tools; then echo 'stale path found'; exit 1; else echo 'no stale skill/Skill_WinCreator path in living files'; fi",
+    "exit_code": 0,
+    "duration_ms": 5,
+    "started_at": "2026-08-02T08:51:59Z",
+    "finished_at": "2026-08-02T08:51:59Z",
+    "cwd": "/home/ubuntu/repos/wincreator",
+    "git": {
+      "available": true,
+      "commit": "b5060176047ee1d26dfe3216e6719de5efbd906b",
+      "branch": "devin/1785659550-proof-infrastructure",
+      "dirty": true,
+      "remote": "https://github.com/winterbim/wincreator"
+    },
+    "environment": {
+      "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+      "python": "3.10.12",
+      "node": "devin-box"
+    },
+    "stdout": {
+      "path": ".wincreator/attestations/V8/20260802T085159Z/stdout.log",
+      "sha256": "c0440d546d6bdde8cd0e1654a38ce67596de29b1f5279e30eafc172e5d6a27e6",
+      "bytes": 53,
+      "tail": "no stale skill/Skill_WinCreator path in living files\n"
+    },
+    "stderr": {
+      "path": ".wincreator/attestations/V8/20260802T085159Z/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": ""
+    },
+    "files": []
+  },
+  "digest": {
+    "alg": "sha256",
+    "value": "4a60b826d585f5e6cbce0628ae23d22a1972293ebc76abbe0ed283af8bf4b2bd"
+  }
+}

@@ -3,9 +3,9 @@
 
 This block is appended to a host project's `CLAUDE.md` to run the WinCreator
 self-improvement circuit there. Paths assume the skill is installed at
-`~/.claude/skills/Skill_WinCreator/`; adjust if you installed it elsewhere.
+`~/.claude/skills/wincreator/`; adjust if you installed it elsewhere.
 
-- Any non-trivial task follows skill-wincreator (classify, announce the gate, Panel).
+- Any non-trivial task follows wincreator (classify, announce the gate, Panel).
 - Every claim is verified by the `wincreator-skeptic` subagent (never self-graded).
 - On every INSUFFICIENT verdict and at the close of every Meso+ loop: invoke `wincreator-retro-analyst`.
 - When `EVOLUTION_QUEUE.md` holds ≥1 proposal with a confirmed pattern, OR every 10 catches, OR on request: invoke `wincreator-skill-surgeon` (one proposal = one Meso loop).
@@ -13,7 +13,7 @@ self-improvement circuit there. Paths assume the skill is installed at
 
 ### Loop files (this project)
 
-- Mechanical gate: `python3 ~/.claude/skills/Skill_WinCreator/scripts/ledger_check.py`
+- Mechanical gate: `python3 ~/.claude/skills/wincreator/scripts/ledger_check.py`
   (run `--self-test` before trusting the gate; expect `20/20 passed`).
 - Proposals queue: `./EVOLUTION_QUEUE.md` (project root).
 - Live catches (written by the retro-analyst): `./SKEPTIC_CATCHES.md` (project root).
@@ -22,7 +22,7 @@ self-improvement circuit there. Paths assume the skill is installed at
 
 Two files can exist. The rule:
 
-- `~/.claude/skills/Skill_WinCreator/SKEPTIC_CATCHES.md` — **read-only inherited
+- `~/.claude/skills/wincreator/SKEPTIC_CATCHES.md` — **read-only inherited
   heritage** (the skill's seed catches). Never written by this project.
 - `./SKEPTIC_CATCHES.md` — **the live project log**. The retro-analyst appends
   here; the surgeon sources confirmed patterns from here.

@@ -9,7 +9,9 @@ re-attacked at the same level, forever.
 **WinCreator turns any non-trivial engineering task into a hierarchy of
 verification-gated loops with an auditable Proof Ledger, Builder/Skeptic
 role separation, and a re-emitted loop state panel that survives long
-sessions.**
+sessions — and since v3.0.0 it does not ask the agent to *describe* its
+proof: `wincreator prove` runs the gate, captures the raw output, hashes
+it, binds it to the commit, and writes the ledger row itself.**
 
 [![ledger-check](https://github.com/winterbim/wincreator/actions/workflows/ledger.yml/badge.svg)](https://github.com/winterbim/wincreator/actions/workflows/ledger.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -18,49 +20,107 @@ sessions.**
 
 ## 30-second demo
 
-The mechanical gate is `scripts/ledger_check.py` — stdlib-only, no
-dependencies. It parses a `PROOF_LEDGER.md` table and refuses to exit 0 if
-any claim is unproven. Below is a real run, not a mockup.
+Two stdlib-only scripts, no dependency, no LLM call, no network:
+[`ledger_check.py`](skill/wincreator/scripts/ledger_check.py) refuses to
+exit 0 while a claim is unproven, and
+[`wincreator.py`](skill/wincreator/scripts/wincreator.py) captures the
+proof so nobody has to be trusted to write it. Every output below is a
+real run, pasted verbatim except for sha256 digests shortened to fit.
 
-Save this exact table as `PROOF_LEDGER_dirty.md` — one unproven claim, one
-rubber-stamped one:
+**1. The gate rejects narrated proof.** Save this as
+`PROOF_LEDGER_dirty.md` — an unproven claim, a rubber stamp, and a row
+that merely *sounds* like evidence:
 
 ```markdown
 | ID | Level | Claim | Gate (what proves it) | Status | Evidence |
 |----|-------|-------|------------------------|--------|----------|
-| P1 | Meso  | /export endpoint returns 200 for all active cases | Run full dataset, inspect status codes | EVIDENCED | run 2026-07-10: pytest -k export -> 14 passed |
+| P1 | Meso  | /export endpoint returns 200 for all active cases | `pytest -k export` on the full dataset | EVIDENCED | run 2026-07-10: `pytest -k export` -> 14 passed |
 | P2 | Micro | parser rejects malformed input | unit test on truncated file | CLAIMED | |
 | P3 | Micro | CSV export matches DB row count | diff row counts after export | EVIDENCED | ok |
+| P4 | Micro | the nightly job finished under 5 min | time the run | EVIDENCED | 2026-08-02 test passed |
 ```
 
 ```
-$ python3 skill/Skill_WinCreator/scripts/ledger_check.py PROOF_LEDGER_dirty.md
-LEDGER NOT CLEAN — 2 violation(s):
-  ✗ line 4 [P2]: CLAIMED with no evidence — loop may not report done. Claim: parser rejects malformed input
-  ✗ line 5 [P3]: status EVIDENCED but Evidence cell is empty or too vague ('ok')
+$ python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER_dirty.md
+LEDGER NOT CLEAN — 3 violation(s):
+  ✗ line 4 [P2]: CLAIMED — loop may not report done. Claim: parser rejects malformed input
+  ✗ line 5 [P3]: EVIDENCED but Evidence empty/vague ('ok')
+  ✗ line 6 [P4]: EVIDENCED but no execution trace (need an exit code, an attestation sha256, a run URL, or a named command in Gate/Evidence WITH a dated or raw result): '2026-08-02 test passed' — prose alone is not proof
 exit=1
 ```
 
-Fix the two claims — real evidence, not "ok":
+**2. The proof is captured, not typed.** `wincreator prove` runs the gate
+and writes the row from what actually happened:
+
+```
+$ python3 skill/wincreator/scripts/wincreator.py prove P2 -- python3 check_parser.py
+parser accepted a truncated file: no error raised
+
+[DISPROVEN] P2: CLAIMED -> DISPROVEN in PROOF_LEDGER.md
+[ATTESTATION] .wincreator/attestations/P2/20260802T084356Z/attestation.json sha256=6f5fac1239…
+[GATE FAILED] exit=1 — the claim is recorded DISPROVEN, not EVIDENCED. A failed gate cannot be written as a proof.
+exit=1
+```
+
+The row it wrote, and what the gate then says about it:
 
 ```markdown
-| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
-|----|-------|-------|------------------------|--------|----------|
-| P1 | Meso  | /export endpoint returns 200 for all active cases | Run full dataset, inspect status codes | EVIDENCED | run 2026-07-10: pytest -k export -> 14 passed |
-| P2 | Micro | parser rejects malformed input | unit test on truncated file | EVIDENCED | pytest -k truncated_input -> 1 passed, AssertionError raised as expected |
-| P3 | Micro | CSV export matches DB row count | diff row counts after export | EVIDENCED | export.csv rows=482, SELECT COUNT(*) FROM cases=482, match |
+| P2 | Micro | parser rejects malformed input | `python3 check_parser.py` | DISPROVEN | wincreator prove 2026-08-02T08:43:56Z: `python3 check_parser.py` -> exit=1 (8 ms); stdout tail: parser accepted a truncated file: no error raised; commit 0ba6a514e1f3+dirty; attestation .wincreator/attestations/P2/20260802T084356Z/attestation.json sha256=6f5fac1239… |
 ```
 
 ```
-$ python3 skill/Skill_WinCreator/scripts/ledger_check.py PROOF_LEDGER_clean.md
-LEDGER CLEAN — 3 row(s) verified in PROOF_LEDGER_clean.md
+$ python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
+LEDGER NOT CLEAN — 1 violation(s):
+  ✗ line 3 [P2]: DISPROVEN — the gate ran and the claim is FALSE; the loop may not report done. Fix and re-prove, or reformulate and mark this row SUPERSEDED. Claim: parser rejects malformed input
+exit=1
+```
+
+Fix the parser, re-run the same command, and the status flips — because
+the exit code flipped, not because anyone said so:
+
+```
+$ python3 skill/wincreator/scripts/wincreator.py prove P2 -- python3 check_parser.py
+truncated file rejected: ValueError raised as expected
+
+[EVIDENCED] P2: DISPROVEN -> EVIDENCED in PROOF_LEDGER.md
+[ATTESTATION] .wincreator/attestations/P2/20260802T084402Z/attestation.json sha256=080f934c78…
+$ python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
+LEDGER CLEAN — 1 row(s) verified in PROOF_LEDGER.md
 exit=0
 ```
 
-That is the entire mechanism. No LLM call, no network, no config. A
-single stdlib-only Python script
-([`ledger_check.py`](skill/Skill_WinCreator/scripts/ledger_check.py), 91
-lines) stands between "the agent said it's done" and a merge.
+**3. Editing the story afterwards is detectable.** Rewrite the captured
+sentence by hand and `verify` re-derives it from the attestation:
+
+```
+$ python3 skill/wincreator/scripts/wincreator.py verify --ledger PROOF_LEDGER.md
+  [OK  ] .wincreator/attestations/P2/20260802T084402Z/attestation.json
+  [OK  ] .wincreator/attestations/P2/20260802T084356Z/attestation.json
+  [LEDGER] 1 attestation reference(s) in PROOF_LEDGER.md
+         ✗ PROOF_LEDGER.md: row P2 evidence text was rewritten after capture (the captured sentence is machine-owned; append your notes after it instead of editing it)
+VERIFY FAILED — 1 problem(s)
+exit=1
+```
+
+That is the entire mechanism. Stdlib only, and it stands between "the
+agent said it's done" and a merge.
+
+## What an attestation contains
+
+Each `prove` run writes `stdout.log`, `stderr.log` and an
+`attestation.json` under `.wincreator/attestations/<claim>/<timestamp>/`:
+the exact argv, the exit code, the duration, UTC start/end, the sha256 of
+stdout and stderr, the sha256 of every `--file` artifact, the git commit /
+branch / dirty flag / remote, the platform, Python version and hostname,
+and a canonical sha256 digest of all of it. Set `WINCREATOR_SIGNING_KEY`
+and the digest is also HMAC-SHA256 signed. `wincreator.py verify`
+re-computes every hash, so a tampered log, a forged verdict, a laundered
+status or a rewritten evidence sentence all surface as failures.
+
+This is a local, self-verifying audit trail — not a transparency log:
+someone who controls the repository can delete an attestation and re-run
+the gate. The intended hardening path is CI-side retention plus signed
+attestations in the in-toto/SLSA family; that is not implemented yet.
 
 ## The three failure modes
 
@@ -88,7 +148,7 @@ and knowing them is the key to using this skill well.
 
 ## Real worked example
 
-[`skill/Skill_WinCreator/references/worked-example.md`](skill/Skill_WinCreator/references/worked-example.md)
+[`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md)
 is a full transcript, not a fiction: a semver comparator with five green
 tests and a docstring promising `ValueError` on malformed input — a
 promise no test actually checked. The Skeptic pass caught the gap that
@@ -101,7 +161,19 @@ the loop was allowed to report up.
 
 ```
 git clone https://github.com/winterbim/wincreator.git
-cp -r wincreator/skill/Skill_WinCreator ~/.claude/skills/Skill_WinCreator
+cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
+```
+
+**Codex / OpenAI agents, Cursor, and any Agent Skills runtime**
+
+The package follows the open Agent Skills layout (`SKILL.md` +
+`agents/openai.yaml` + `scripts/` + `references/`), so copying
+`skill/wincreator/` into your runtime's skills directory is the whole
+install. Check it yourself:
+
+```
+$ python3 skill/wincreator/scripts/package_check.py skill/wincreator
+PACKAGE VALID — skill/wincreator matches the Agent Skills conventions
 ```
 
 **npx skills**
@@ -112,9 +184,17 @@ npx skills add winterbim/wincreator
 
 **Manual download**
 
-Download `Skill_WinCreator.skill` from the
+Download `wincreator.skill` from the
 [latest release](https://github.com/winterbim/wincreator/releases/latest)
-and unzip it into your skills directory.
+and unzip it into your skills directory. Each release ships a
+`wincreator.skill.sha256` beside it; the same asset and checksum are
+rebuilt in CI by `./tools/build_package.sh`, so you can check what you
+downloaded instead of trusting it.
+
+> Installing from an older release? The package directory was renamed
+> `Skill_WinCreator` → `wincreator` in v3.0.0 to satisfy the Agent Skills
+> rule that the skill name matches its directory. Remove the old
+> `~/.claude/skills/Skill_WinCreator` after installing.
 
 ## This repo eats its own dogfood
 
@@ -123,11 +203,26 @@ sample — it is the real ledger for the act of publishing this repository:
 every claim made while shipping WinCreator (structure preserved
 unmodified, demo output real, no placeholder credentials committed,
 attribution consistent) is a row in that file, and
-`.github/workflows/ledger.yml` runs `ledger_check.py` against it on every
-push. The green badge at the top of this page is that check, live, not a
-static image — its
-[most recent run](https://github.com/winterbim/wincreator/actions/runs/29097155491)
-verified all rows in `PROOF_LEDGER.md` on GitHub's own runner.
+`.github/workflows/ledger.yml` runs it against every ledger in the repo on
+every push — after making the verifier prove itself first
+(`--self-test` for all three scripts, `py_compile`, package validation),
+because a verifier that was never attacked is an unverified claim. The
+v3 work itself is captured in
+[`PROOF_LEDGER-v3-proof-capture.md`](PROOF_LEDGER-v3-proof-capture.md),
+whose rows were written by `wincreator prove`, not by hand. The green
+badge at the top of this page is that workflow, live, not a static image.
+
+## How much ceremony? Three tiers
+
+The full hierarchy is not always the right answer, and applying it to a
+typo is how a governance skill becomes the problem it was built to solve.
+Pick a tier and say which one you picked:
+
+| Tier | Use when | What you run |
+|---|---|---|
+| **Lite** (default) | one claim, one gate, checkable now | announce the gate, execute it, quote the raw result — no ledger file |
+| **Standard** | multi-step work whose failure is expensive or silent | Loop Panel + `PROOF_LEDGER.md` + Skeptic pass + `ledger_check.py` |
+| **Regulated** | audited, contractual or safety-relevant work | Standard + `wincreator prove` on every claim, `--strict-attestation`, retained artifacts, human sign-off |
 
 ## Bootstrap the evolution loop in your own project
 
@@ -140,7 +235,7 @@ repository scaffolding, so it travels via `git clone`, not the single-file
 ```bash
 # sources: your clone of this repo, and wherever you installed the skill
 WINCREATOR=/path/to/wincreator                 # git clone of this repo
-SKILL=~/.claude/skills/Skill_WinCreator        # where you installed the skill
+SKILL=~/.claude/skills/wincreator              # where you installed the skill
 
 cd /path/to/your/project
 
@@ -157,7 +252,8 @@ cat "$WINCREATOR"/templates/CLAUDE.evolution.md >> CLAUDE.md
 [ -f SKEPTIC_CATCHES.md ] || printf '# Skeptic Catches — project log\n\n| Date | Class | Why missed | Question that would have caught it |\n|------|-------|------------|-------------------------------------|\n' > SKEPTIC_CATCHES.md
 
 # 4. the ONLY install smoke test:
-python3 "$SKILL"/scripts/ledger_check.py --self-test     # -> self-test: 20/20 passed
+python3 "$SKILL"/scripts/ledger_check.py --self-test     # -> self-test: 36/36 passed
+python3 "$SKILL"/scripts/wincreator.py --self-test       # -> self-test: 26/26 passed
 ```
 
 Every command above was executed in a virgin directory before being
@@ -171,7 +267,7 @@ setup must know:
   meaningful after real loops feed the log. Use `--self-test` (not
   `--catches`) as the install check.
 - **Two `SKEPTIC_CATCHES.md` can exist; the authority is decided.** The one
-  in `~/.claude/skills/Skill_WinCreator/` is read-only inherited heritage;
+  in `~/.claude/skills/wincreator/` is read-only inherited heritage;
   your project's `./SKEPTIC_CATCHES.md` is the live log the retro-analyst
   writes. A Meso+ loop re-reads **both** at its start. The full rule is in
   `templates/CLAUDE.evolution.md`, which step 2 appends to your `CLAUDE.md`.
@@ -187,14 +283,14 @@ unverified "done," consider supporting its development:
 
 MIT — see [LICENSE](LICENSE). Copyright Winter Fernandes.
 
-If you use, fork, or build upon this skill, credit Winter Fernandes as
-the original creator with a link back to this repository. The MIT
-license already requires the copyright notice to be preserved; this line
-makes that expectation explicit and visible.
+The MIT license is the whole legal obligation: keep the copyright notice
+and the license text in substantial copies. Beyond that, a credit to
+Winter Fernandes with a link back to this repository is a **request, not
+a condition** — appreciated, never enforced. See [NOTICE](NOTICE).
 
 ---
 
 Created by **Winter Fernandes** — BIMCheck Consulting
 [bimcheck-consulting.com](https://bimcheck-consulting.com)
 
-Attribution required in derivatives — see [NOTICE](NOTICE).
+Attribution appreciated in derivatives — see [NOTICE](NOTICE).

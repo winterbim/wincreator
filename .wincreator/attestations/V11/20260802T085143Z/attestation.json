@@ -1,0 +1,49 @@
+{
+  "payload": {
+    "schema": "wincreator.attestation/v1",
+    "tool_version": "3.0.0",
+    "claim_id": "V11",
+    "ledger": "PROOF_LEDGER-v3-proof-capture.md",
+    "verdict": "EVIDENCED",
+    "command": [
+      "bash",
+      "-c",
+      "set -e; grep -n '  version: 3.0.0' skill/wincreator/SKILL.md; grep -n '^## \\[3.0.0\\]' skill/wincreator/CHANGELOG.md CHANGELOG.md; grep -n 'VERSION = \"3.0.0\"' skill/wincreator/scripts/*.py"
+    ],
+    "command_string": "bash -c set -e; grep -n '  version: 3.0.0' skill/wincreator/SKILL.md; grep -n '^## \\[3.0.0\\]' skill/wincreator/CHANGELOG.md CHANGELOG.md; grep -n 'VERSION = \"3.0.0\"' skill/wincreator/scripts/*.py",
+    "exit_code": 0,
+    "duration_ms": 3,
+    "started_at": "2026-08-02T08:51:43Z",
+    "finished_at": "2026-08-02T08:51:43Z",
+    "cwd": "/home/ubuntu/repos/wincreator",
+    "git": {
+      "available": true,
+      "commit": "b5060176047ee1d26dfe3216e6719de5efbd906b",
+      "branch": "devin/1785659550-proof-infrastructure",
+      "dirty": true,
+      "remote": "https://github.com/winterbim/wincreator"
+    },
+    "environment": {
+      "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+      "python": "3.10.12",
+      "node": "devin-box"
+    },
+    "stdout": {
+      "path": ".wincreator/attestations/V11/20260802T085143Z/stdout.log",
+      "sha256": "1ae0fd4f11da2a8935671a3f6a48fd02f9f330e9e851b57cff729215c188d309",
+      "bytes": 305,
+      "tail": "16:  version: 3.0.0\nskill/wincreator/CHANGELOG.md:7:## [3.0.0] — 2026-08-02\nCHANGELOG.md:13:## [3.0.0] — 2026-08-02\nskill/wincreator/scripts/ledger_check.py:58:VERSION = \"3.0.0\"\nskill/wincreator/scripts/package_check.py:23:VERSION = \"3.0.0\"\nskill/wincreator/scripts/wincreator.py:45:VERSION = \"3.0.0\"\n"
+    },
+    "stderr": {
+      "path": ".wincreator/attestations/V11/20260802T085143Z/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": ""
+    },
+    "files": []
+  },
+  "digest": {
+    "alg": "sha256",
+    "value": "52c873792c4c6412f2f99e2f89781657e1a5a1440351ef129917e8a7b65edaba"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "payload": {
+    "schema": "wincreator.attestation/v1",
+    "tool_version": "3.0.0",
+    "claim_id": "V7",
+    "ledger": "PROOF_LEDGER-v3-proof-capture.md",
+    "verdict": "EVIDENCED",
+    "command": [
+      "python3",
+      "skill/wincreator/scripts/ledger_check.py",
+      "--catches",
+      "skill/wincreator/SKEPTIC_CATCHES.md"
+    ],
+    "command_string": "python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md",
+    "exit_code": 0,
+    "duration_ms": 18,
+    "started_at": "2026-08-02T08:51:42Z",
+    "finished_at": "2026-08-02T08:51:42Z",
+    "cwd": "/home/ubuntu/repos/wincreator",
+    "git": {
+      "available": true,
+      "commit": "b5060176047ee1d26dfe3216e6719de5efbd906b",
+      "branch": "devin/1785659550-proof-infrastructure",
+      "dirty": true,
+      "remote": "https://github.com/winterbim/wincreator"
+    },
+    "environment": {
+      "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+      "python": "3.10.12",
+      "node": "devin-box"
+    },
+    "stdout": {
+      "path": ".wincreator/attestations/V7/20260802T085142Z/stdout.log",
+      "sha256": "442a08e67f9ed525ad38f9ea08ec73979f978cdf756f2051111b6bd4cd557ee0",
+      "bytes": 82,
+      "tail": "CATCHES ALIVE — 16 well-formed catch(es) in skill/wincreator/SKEPTIC_CATCHES.md\n"
+    },
+    "stderr": {
+      "path": ".wincreator/attestations/V7/20260802T085142Z/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": ""
+    },
+    "files": []
+  },
+  "digest": {
+    "alg": "sha256",
+    "value": "1f3a274b58d127fefe2dae735165dbdda6e317601133ad2520ec0b346d0e9c2e"
+  }
+}

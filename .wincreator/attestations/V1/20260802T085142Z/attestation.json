@@ -1,0 +1,49 @@
+{
+  "payload": {
+    "schema": "wincreator.attestation/v1",
+    "tool_version": "3.0.0",
+    "claim_id": "V1",
+    "ledger": "PROOF_LEDGER-v3-proof-capture.md",
+    "verdict": "EVIDENCED",
+    "command": [
+      "python3",
+      "skill/wincreator/scripts/ledger_check.py",
+      "--self-test"
+    ],
+    "command_string": "python3 skill/wincreator/scripts/ledger_check.py --self-test",
+    "exit_code": 0,
+    "duration_ms": 20,
+    "started_at": "2026-08-02T08:51:42Z",
+    "finished_at": "2026-08-02T08:51:42Z",
+    "cwd": "/home/ubuntu/repos/wincreator",
+    "git": {
+      "available": true,
+      "commit": "b5060176047ee1d26dfe3216e6719de5efbd906b",
+      "branch": "devin/1785659550-proof-infrastructure",
+      "dirty": true,
+      "remote": "https://github.com/winterbim/wincreator"
+    },
+    "environment": {
+      "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+      "python": "3.10.12",
+      "node": "devin-box"
+    },
+    "stdout": {
+      "path": ".wincreator/attestations/V1/20260802T085142Z/stdout.log",
+      "sha256": "e3fb3f85bb16745ada9889dbd0b324f7386b9632b5f041ed4425a6068f8c218d",
+      "bytes": 2124,
+      "tail": "_ok (expected clean, got 0)\n  [PASS] vague_evidence_caught (expected violations, got 1)\n  [PASS] claimed_caught (expected violations, got 1)\n  [PASS] pending_with_command_ok (expected clean, got 0)\n  [PASS] empty_evidence_caught (expected violations, got 1)\n  [PASS] pending_no_command_caught (expected violations, got 1)\n  [PASS] pending_with_command_still_ok (expected clean, got 0)\n  [PASS] waived_no_date_caught (expected violations, got 1)\n  [PASS] waived_with_date_ok (expected clean, got 0)\n  [PASS] orphan_ledger_row_caught (expected violations, got 1)\n  [PASS] foreign_6col_not_orphan (expected clean, got 0)\n  [PASS] foreign_status_col_not_orphan (expected clean, got 0)\n  [PASS] orphan_5cell_caught (expected violations, got 1)\n  [PASS] fenced_example_ignored (expected clean, got 0)\n  [PASS] bare_date_and_passed_caught (expected violations, got 1)\n  [PASS] command_without_result_caught (expected violations, got 1)\n  [PASS] gate_command_with_dated_result_ok (expected clean, got 0)\n  [PASS] bare_url_word_caught (expected violations, got 1)\n  [PASS] exit_code_ok (expected clean, got 0)\n  [PASS] ci_run_url_ok (expected clean, got 0)\n  [PASS] attestation_ok (expected clean, got 0)\n  [PASS] disproven_blocks (expected violations, got 1)\n  [PASS] disproven_needs_execution (expected violations, got 2)\n  [PASS] superseded_ok (expected clean, got 0)\n  [PASS] superseded_without_target_caught (expected violations, got 1)\n  [PASS] blocked_ok (expected clean, got 0)\n  [PASS] blocked_without_dependency_caught (expected violations, got 1)\n  [PASS] unknown_status_caught (expected violations, got 1)\n  [PASS] strict_rejects_handwritten_evidence (expected violations, got 1)\n  [PASS] strict_accepts_attestation (expected clean, got 0)\n  [PASS] catches_alive_ok (expected alive, got alive)\n  [PASS] catches_stale_caught (expected stale, got stale)\n  [PASS] catches_foreign_table_stale (expected stale, got stale)\n  [PASS] catches_3col_alive (expected alive, got alive)\nself-test: 36/36 passed\n"
+    },
+    "stderr": {
+      "path": ".wincreator/attestations/V1/20260802T085142Z/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": ""
+    },
+    "files": []
+  },
+  "digest": {
+    "alg": "sha256",
+    "value": "d83e7ce98aa0a1a57074aab808814f04b053d5cb3969b7f563db8d662fd4ebf6"
+  }
+}

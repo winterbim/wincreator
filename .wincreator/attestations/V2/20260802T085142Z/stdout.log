@@ -1,0 +1,31 @@
+flags parsed
+
+[EVIDENCED] P1: EVIDENCED -> EVIDENCED in /tmp/wincreator-selftest-3huaptc9/PROOF_LEDGER.md
+[ATTESTATION] /tmp/wincreator-selftest-3huaptc9/.wincreator/attestations/P1/20260802T085142Z/attestation.json sha256=76affcbd6e72f8fa24a8bc614d38a9e677963d18ed0741176c34580c59e3099b
+  [PASS] passing_gate_is_evidenced
+  [PASS] evidence_carries_exit_code
+  [PASS] evidence_carries_attestation_digest
+  [PASS] stdout_captured
+  [PASS] exit_code_recorded
+  [PASS] failing_gate_is_disproven
+  [PASS] failing_gate_never_evidenced
+  [PASS] failing_exit_code_recorded
+  [PASS] stderr_captured
+  [PASS] ledger_gate_sees_both_rows
+  [PASS] ledger_gate_accepts_captured_evidence
+  [PASS] ledger_gate_blocks_on_disproven
+  [PASS] pipe_in_output_escaped
+  [PASS] newline_in_output_flattened
+  [PASS] verify_ok_on_untouched
+  [PASS] verify_catches_tampered_log
+  [PASS] verify_catches_forged_verdict
+  [PASS] verify_catches_broken_ledger_reference
+  [PASS] verify_catches_status_laundering
+  [PASS] appending_a_note_is_allowed
+  [PASS] verify_catches_rewritten_evidence
+  [PASS] options_after_claim_id_are_not_swallowed
+  [PASS] attestation_signed_when_key_set
+  [PASS] signature_verifies_with_right_key
+  [PASS] signature_fails_with_wrong_key
+  [PASS] unknown_claim_id_raises
+self-test: 26/26 passed

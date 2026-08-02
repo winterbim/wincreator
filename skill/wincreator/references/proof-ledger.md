@@ -19,40 +19,67 @@ One markdown table. Columns are fixed. One row per claim.
 | P3 | Micro | perf ≥ target on large files | benchmark on real corpus | WAIVED | user 2026-07-10: "ship without the benchmark, we'll measure next sprint" |
 ```
 
-## Status semantics (exactly four)
+## Status semantics (exactly seven since v3)
+
+Two statuses block a loop from reporting done: `CLAIMED` and `DISPROVEN`.
 
 - `CLAIMED` — asserted, no evidence yet. A working state only. **No loop may
   report "done" while a CLAIMED row remains.**
-- `EVIDENCED` — the Evidence cell must contain the command/action that was
-  actually executed AND a reference to its raw result (inline summary of the
-  raw output, a file path, a CI run link). An empty or vague Evidence cell
-  makes the row invalid.
+- `EVIDENCED` — the Evidence cell must carry an execution trace: an exit
+  code, an attestation sha256, a CI run URL, or a named command together
+  with a dated/raw result. An empty, vague or purely narrative cell makes the
+  row invalid.
+- `DISPROVEN` — the gate ran and the claim turned out **false**. Same
+  evidence requirement as EVIDENCED: a negative result is a result, and it
+  is kept. Blocking, because a false claim is not a finished loop.
 - `PENDING` — the proof is defined but cannot be executed in the current
   context (no execution tool; runs on the developer's machine). The Evidence
   cell must contain the exact command handed to the developer.
+- `BLOCKED` — the gate cannot run because of an external dependency. The
+  Evidence cell must **name** the blocker (who/what is awaited) and carry a
+  date. "Blocked" without a named blocker is an excuse, not a status.
 - `WAIVED` — the user explicitly accepted proceeding without proof. The
   Evidence cell must quote or closely paraphrase the user's words and date.
   Waivers are visible debt, never a silent pass.
+- `SUPERSEDED` — the claim was replaced by a reformulated one. The Evidence
+  cell must name the successor row (`superseded by P-014`), so the trail is
+  never broken by a rewrite.
 
 ## Rules
 
 1. Only the Skeptic role writes or changes a Status (see
    `references/agents.md`).
-2. Statuses only move forward within a loop: CLAIMED → (EVIDENCED | PENDING |
-   WAIVED). A PENDING row becomes EVIDENCED only when the raw result arrives
-   and is inspected.
+2. Statuses only move forward within a loop: CLAIMED → (EVIDENCED |
+   DISPROVEN | PENDING | BLOCKED | WAIVED). A PENDING or BLOCKED row becomes
+   EVIDENCED only when the raw result arrives and is inspected.
 3. If new evidence contradicts an EVIDENCED row (a regression), the row goes
-   back to CLAIMED and the loop that owned it reopens. Note the regression in
-   the Evidence cell history rather than deleting it.
+   to DISPROVEN and the loop that owned it reopens. Never delete a DISPROVEN
+   row and never quietly downgrade it: fix the thing and re-prove it, or
+   reformulate the claim in a new row and mark the old one SUPERSEDED.
 4. At the end of every Meso loop, run the mechanical check:
 
    ```
    python scripts/ledger_check.py PROOF_LEDGER.md
    ```
 
-   Exit code 0 = ledger clean (no CLAIMED rows, all EVIDENCED rows carry
-   evidence). Non-zero = the loop is not allowed to report "done". This is
-   deliberately CI-friendly: add it to your pipeline if you have one.
+   Exit code 0 = ledger clean (no CLAIMED or DISPROVEN rows, every row
+   carrying what its status requires). Non-zero = the loop is not allowed to
+   report "done". This is deliberately CI-friendly: add it to your pipeline
+   if you have one. `--strict-attestation` additionally requires every
+   EVIDENCED/DISPROVEN row to cite a captured attestation — the Regulated
+   tier.
+
+5. Whenever the gate is a command you can actually run, do not write the
+   Evidence cell at all — capture it:
+
+   ```
+   python3 scripts/wincreator.py prove P2 -- pytest tests/test_export.py -q
+   ```
+
+   The captured sentence is machine-owned: append your notes after it, never
+   rewrite it. `wincreator.py verify --ledger PROOF_LEDGER.md` re-derives it
+   from the attestation and reports any row whose status or text drifted
+   from what was actually captured.
 
 ## Why this exists
 
@@ -88,9 +115,18 @@ symmetrically, not only for EVIDENCED:
 - a WAIVED row must contain a date (the ISO date of the user's decision).
   A dateless "user said skip it" is rejected.
 
-Both are structural proxies, honestly limited like the EVIDENCED marker:
-they check the required element is present, not that it is faithful — that
-stays the Skeptic's job. Since v2.3 (EVO-003), `--catches` is schema-gated
+Since v3.0 (the audit of 2026-08-02), each status is checked against its own
+marker instead of one shared heuristic — the old `EXEC_MARKER` let a bare
+date satisfy a PENDING row that was supposed to carry a command. EVIDENCED
+and DISPROVEN now need an execution trace (exit code, attestation digest, CI
+run URL, or a named command *plus* a dated/raw result); a lone date, a lone
+URL or "test passed" prose no longer qualifies. SUPERSEDED needs a named
+successor, BLOCKED a named blocker and a date.
+
+These remain structural proxies, honestly limited: they check the required
+element is present, not that it is faithful — that stays the Skeptic's job,
+unless the row was produced by `wincreator prove`, in which case the exit
+code and the hashes carry it instead. Since v2.3 (EVO-003), `--catches` is schema-gated
 the same way the ledger parser is: only rows under a real catches header
 (`Date | Class(e)…`) count, so a foreign table with an ISO date no longer
 reads as a live catch.

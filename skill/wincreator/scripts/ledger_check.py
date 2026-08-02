@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ledger_check.py v2 — mechanical gate for the Proof Ledger.
+"""ledger_check.py v3 — mechanical gate for the Proof Ledger.
 
 Parses PROOF_LEDGER.md and exits non-zero if the ledger is not clean.
 Stdlib only. CI-friendly.
@@ -28,28 +28,121 @@ v2.3 EVO-003: --catches is schema-gated like the ledger parser, so a foreign
 table with an ISO date no longer reads as ALIVE (fix B carried to the newer
 surface — the exact "verifier shipped unverified" class, recurring).
 
+v3.0 EVO-006/007/008 (breaking: the status set and the evidence rules change):
+  E. three statuses added — DISPROVEN (the gate ran and the claim is FALSE),
+     SUPERSEDED (the claim was replaced by a reformulated one), BLOCKED (the
+     gate cannot run because of a named external dependency). Before v3 a
+     negative result had no representation at all, so failures either
+     disappeared or were dressed up as PENDING.
+  F. the single generic EXEC_MARKER is replaced by per-status validators:
+     EXECUTION (EVIDENCED/DISPROVEN), COMMAND (PENDING), USER_WAIVER (WAIVED),
+     SUPERSESSION (SUPERSEDED), BLOCKER (BLOCKED). A bare ISO date, or the bare
+     word "http", no longer satisfies "a command was executed": execution now
+     needs an exit code, an attestation, a run URL, or a named command (in the
+     row's Gate or Evidence) together with a dated/raw result.
+  G. --strict-attestation (Regulated tier): every EVIDENCED/DISPROVEN row must
+     reference a `wincreator prove` attestation (path + sha256), i.e. machine-
+     captured evidence rather than a hand-written sentence.
+
 Usage:
     python ledger_check.py [PROOF_LEDGER.md]     (default: PROOF_LEDGER.md)
     python ledger_check.py --self-test           (run embedded adversarial suite)
     python ledger_check.py --catches [FILE]      (default: SKEPTIC_CATCHES.md)
+    python ledger_check.py --strict-attestation [FILE]
 
 Exit codes: 0 clean/alive | 1 violations/stale | 2 file/table missing or self-test failed
 """
 import re
 import sys
 
-VALID_STATUSES = {"CLAIMED", "EVIDENCED", "PENDING", "WAIVED"}
+VERSION = "3.0.0"
+
+# Statuses that may legitimately appear in a ledger.
+VALID_STATUSES = {
+    "CLAIMED", "EVIDENCED", "PENDING", "WAIVED",
+    "DISPROVEN", "SUPERSEDED", "BLOCKED",
+}
+# Statuses that forbid a loop from reporting "done".
+BLOCKING_STATUSES = {"CLAIMED", "DISPROVEN"}
 MIN_EVIDENCE_LEN = 10
 EXPECTED_HEADER = ["id", "level", "claim", "gate", "status", "evidence"]
 
-# Markers that suggest an actually-executed proof: a command, a path, a date,
-# raw-output fragments, exit codes. Heuristic by design.
-EXEC_MARKER = re.compile(
-    r"(run[: ]|exec|exit[= ]|->|→|\$ |`.+`|/[\w.\-]+/|\d{4}-\d{2}-\d{2}"
-    r"|passed|failed|ok\b.*\d|#\d+|http)", re.IGNORECASE)
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+BACKTICKED = re.compile(r"`[^`]+`")
+SHELL_PROMPT = re.compile(r"(^|\s)\$ \S")
+COMMAND_WORD = re.compile(r"\b(command|commande|cmd|run this|à exécuter)\b\s*[:=]?",
+                          re.IGNORECASE)
+EXIT_CODE = re.compile(r"\bexit\s*(code)?\s*[=: ]\s*-?\d+|\breturncode\b|\bexit=\d",
+                       re.IGNORECASE)
+ATTESTATION = re.compile(r"attestation\b[^|]{0,120}?sha256[:= ]\s*[0-9a-f]{16,}",
+                         re.IGNORECASE)
+RUN_URL = re.compile(r"https?://[^\s|]+/[^\s|]+")
+# A fragment of an actual result, as opposed to a promise about one.
+RESULT_FRAGMENT = re.compile(
+    r"->|→|\b\d+\s*(passed|failed|errors?|ok|rows?|bytes|chars|matches|tests?|files?)\b"
+    r"|\b(passed|failed|match(ed|es)?|CLEAN|NOT CLEAN|ALIVE|STALE|HTTP \d{3})\b"
+    r"|\b\w+=\S|\b\d+\s*(ms|s)\b", re.IGNORECASE)
+USER_VOICE = re.compile(r"\b(user|utilisateur|owner|client|approved by|waived by)\b|[\"“”«»]",
+                        re.IGNORECASE)
+SUPERSESSION = re.compile(r"\b(supersed\w*|superced\w*|replac\w*|remplac\w*)\b",
+                          re.IGNORECASE)
+CLAIM_ID = re.compile(r"\b[A-Za-z]{1,4}[-_]?\d+(?:-\d+)?\b")
+BLOCKER = re.compile(
+    r"\b(blocked (by|on)|blocking dependency|waiting on|depends on|"
+    r"bloqu\w+ par|d[ée]pend\w* de|en attente de)\b", re.IGNORECASE)
 
 SPLIT_UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
-ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def has_command(evidence: str) -> bool:
+    """The Evidence cell names a concrete command (or path) to execute."""
+    return bool(BACKTICKED.search(evidence) or SHELL_PROMPT.search(evidence)
+                or COMMAND_WORD.search(evidence))
+
+
+def has_execution(evidence: str, gate: str = "") -> bool:
+    """The row carries a trace of an execution that actually happened.
+
+    Deliberately stricter than v2's EXEC_MARKER, which accepted a bare ISO date
+    or the bare word "http": writing "2026-08-02 test passed" in a cell proved
+    nothing. Still a heuristic, still unable to judge truthfulness (that is the
+    Skeptic's job, and `wincreator prove` is the machine-captured alternative)
+    — but the row must now show at least one of:
+
+    - an attestation reference with a sha256 (machine-captured evidence);
+    - an exit code / returncode;
+    - a run/artifact URL with a path;
+    - a named command (in Evidence, or in the Gate column that is supposed to
+      hold it) TOGETHER with a dated or raw result in Evidence.
+
+    A command with no result, or a result with no command, is not enough.
+    """
+    if ATTESTATION.search(evidence) or EXIT_CODE.search(evidence):
+        return True
+    if RUN_URL.search(evidence):
+        return True
+    named_command = has_command(evidence) or has_command(gate)
+    result = bool(ISO_DATE.search(evidence)) or bool(RESULT_FRAGMENT.search(evidence))
+    return named_command and result
+
+
+def has_attestation(evidence: str) -> bool:
+    return bool(ATTESTATION.search(evidence))
+
+
+def has_user_waiver(evidence: str) -> bool:
+    """WAIVED: the user's own words, dated. Structural proxy for both."""
+    return bool(ISO_DATE.search(evidence)) and bool(USER_VOICE.search(evidence))
+
+
+def has_supersession(evidence: str) -> bool:
+    """SUPERSEDED: says what replaced it, and names the replacing row."""
+    return bool(SUPERSESSION.search(evidence)) and bool(CLAIM_ID.search(evidence))
+
+
+def has_blocker(evidence: str) -> bool:
+    """BLOCKED: names the external dependency, and dates the block."""
+    return bool(BLOCKER.search(evidence)) and bool(ISO_DATE.search(evidence))
 
 
 def _clean(cell: str) -> str:
@@ -149,7 +242,7 @@ def parse_ledger_rows(text):
         prev = cells
 
 
-def check_text(text, label="ledger"):
+def check_text(text, label="ledger", strict_attestation=False):
     violations, rows_seen = [], 0
     for line_no, cells, orphan in parse_ledger_rows(text):
         if orphan:
@@ -165,48 +258,74 @@ def check_text(text, label="ledger"):
         rows_seen += 1
         row_id, _lvl, claim, _gate, status, evidence = cells[:6]
         status_u = _strip_emphasis(status).upper()
+        prefix = f"line {line_no} [{row_id}]"
         if status_u not in VALID_STATUSES:
-            violations.append(f"line {line_no} [{row_id}]: unknown status '{status}'")
-        elif status_u == "CLAIMED":
+            violations.append(f"{prefix}: unknown status '{status}' "
+                              f"(valid: {', '.join(sorted(VALID_STATUSES))})")
+            continue
+        if status_u == "CLAIMED":
             violations.append(
-                f"line {line_no} [{row_id}]: CLAIMED — loop may not report done. "
-                f"Claim: {claim[:60]}")
-        elif len(evidence) < MIN_EVIDENCE_LEN:
+                f"{prefix}: CLAIMED — loop may not report done. Claim: {claim[:60]}")
+            continue
+        if len(evidence) < MIN_EVIDENCE_LEN:
             violations.append(
-                f"line {line_no} [{row_id}]: {status_u} but Evidence empty/vague "
-                f"('{evidence}')")
-        elif status_u == "EVIDENCED" and not EXEC_MARKER.search(evidence):
+                f"{prefix}: {status_u} but Evidence empty/vague ('{evidence}')")
+            continue
+        if status_u in ("EVIDENCED", "DISPROVEN") and not has_execution(evidence, _gate):
             violations.append(
-                f"line {line_no} [{row_id}]: EVIDENCED but no execution marker "
-                f"(command, date, path, output fragment) in Evidence: '{evidence[:60]}' "
+                f"{prefix}: {status_u} but no execution trace (need an exit code, "
+                f"an attestation sha256, a run URL, or a named command in "
+                f"Gate/Evidence WITH a dated or raw result): '{evidence[:60]}' "
                 f"— prose alone is not proof")
-        elif status_u == "PENDING" and not EXEC_MARKER.search(evidence):
-            # v2.2 EVO-002: the spec requires PENDING evidence to hold the exact
-            # command handed to the developer. Enforce it like EVIDENCED, not
-            # just the >=10-char check (asymmetric enforcement was the defect).
+        elif (strict_attestation and status_u in ("EVIDENCED", "DISPROVEN")
+                and not has_attestation(evidence)):
             violations.append(
-                f"line {line_no} [{row_id}]: PENDING but no command marker in "
-                f"Evidence (spec: hold the exact command handed to the dev): "
+                f"{prefix}: {status_u} without a machine-captured attestation "
+                f"(--strict-attestation: run `wincreator prove {row_id} -- <cmd>`): "
                 f"'{evidence[:60]}'")
-        elif status_u == "WAIVED" and not ISO_DATE.search(evidence):
-            # v2.2 EVO-002: the spec requires WAIVED evidence to quote the user's
-            # words AND date. ISO date is the structural proxy (honestly limited,
-            # like EXEC_MARKER: it checks the date is present, not that the quote
-            # is faithful — that stays the Skeptic's job).
+        elif status_u == "PENDING" and not has_command(evidence):
+            # v2.2 EVO-002: the spec requires PENDING evidence to hold the exact
+            # command handed to the developer. v3 checks for a command
+            # specifically — a date or a URL no longer satisfies it.
             violations.append(
-                f"line {line_no} [{row_id}]: WAIVED but no date in Evidence "
-                f"(spec: quote the user's words and date): '{evidence[:60]}'")
+                f"{prefix}: PENDING but no command in Evidence (spec: hold the "
+                f"exact command handed to the dev, in backticks): '{evidence[:60]}'")
+        elif status_u == "WAIVED" and not has_user_waiver(evidence):
+            # The spec requires WAIVED evidence to quote the user's words AND
+            # date them. Structural proxy, honestly limited like the others:
+            # it checks both elements are present, not that the quote is
+            # faithful — that stays the Skeptic's job.
+            violations.append(
+                f"{prefix}: WAIVED but Evidence lacks the user's dated words "
+                f"(spec: quote the user and date the waiver): '{evidence[:60]}'")
+        elif status_u == "SUPERSEDED" and not has_supersession(evidence):
+            violations.append(
+                f"{prefix}: SUPERSEDED but Evidence does not name the replacing "
+                f"claim (spec: 'superseded by <ID>: <reason>'): '{evidence[:60]}'")
+        elif status_u == "BLOCKED" and not has_blocker(evidence):
+            violations.append(
+                f"{prefix}: BLOCKED but Evidence does not name a dated external "
+                f"blocker (spec: 'blocked by <dependency>, <date>'): "
+                f"'{evidence[:60]}'")
+        if status_u == "DISPROVEN":
+            # A negative result is a first-class, retained record — and it still
+            # forbids reporting done. Retire it via SUPERSEDED once the claim is
+            # reformulated and re-proven.
+            violations.append(
+                f"{prefix}: DISPROVEN — the gate ran and the claim is FALSE; the "
+                f"loop may not report done. Fix and re-prove, or reformulate and "
+                f"mark this row SUPERSEDED. Claim: {claim[:60]}")
     return violations, rows_seen
 
 
-def check(path):
+def check(path, strict_attestation=False):
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except OSError as e:
         print(f"ERROR: cannot read {path}: {e}")
         return 2
-    violations, rows_seen = check_text(text)
+    violations, rows_seen = check_text(text, strict_attestation=strict_attestation)
     if rows_seen == 0 and not violations:
         print(f"ERROR: no ledger table found in {path} "
               "(header must be: ID | Level | Claim | Gate... | Status | Evidence)")
@@ -216,7 +335,8 @@ def check(path):
         for v in violations:
             print(f"  ✗ {v}")
         return 1
-    print(f"LEDGER CLEAN — {rows_seen} row(s) verified in {path}")
+    mode = " [strict-attestation]" if strict_attestation else ""
+    print(f"LEDGER CLEAN{mode} — {rows_seen} row(s) verified in {path}")
     return 0
 
 
@@ -286,12 +406,12 @@ HDR = "| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n" \
 SELF_TESTS = [
     # (name, text, expect_violations: bool)
     ("escaped_pipe_ok", HDR +
-     "| P1 | Micro | handles `a \\| b` | test executed | EVIDENCED | run 2026-07-11: pytest -> 4 passed |\n", False),
+     "| P1 | Micro | handles `a \\| b` | test executed | EVIDENCED | run 2026-07-11: `pytest` -> 4 passed |\n", False),
     ("foreign_table_ignored",
      "| Option | Avantage |\n|---|---|\n| Rust | rapide |\n\n" + HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run: pytest -> 6 passed |\n", False),
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> 6 passed |\n", False),
     ("bold_status_ok", HDR +
-     "| P1 | Micro | ok | test | **EVIDENCED** | run: pytest -> 6 passed |\n", False),
+     "| P1 | Micro | ok | test | **EVIDENCED** | run 2026-07-11: `pytest` -> 6 passed |\n", False),
     ("vague_evidence_caught", HDR +
      "| P1 | Micro | ok | test | EVIDENCED | ça marche bien |\n", True),
     ("claimed_caught", HDR +
@@ -312,24 +432,63 @@ SELF_TESTS = [
     # v2.4 EVO-002... EVO-004: an orphan ledger row detached by a blank line
     # must NOT silently read CLEAN.
     ("orphan_ledger_row_caught", HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n\n"
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> passed |\n\n"
      "| P2 | Micro | orphan | test | CLAIMED | |\n", True),
     ("foreign_6col_not_orphan",
      "| A | B | C | D | E | F |\n|--|--|--|--|--|--|\n| 1 | 2 | 3 | 4 | 5 | 6 |\n\n" + HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> passed |\n", False),
     # v2.5 EVO-005: parser-level fixes after the v2.4 orphan heuristic proved
     # both too aggressive (foreign 'Status' column) and too lax (5-cell / fenced).
     ("foreign_status_col_not_orphan",
      "| Task | Owner | Priority | Due | Status | Notes |\n"
      "|------|-------|----------|-----|--------|-------|\n"
      "| Rewrite | wina | high | Q3 | PENDING | later |\n\n" + HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> passed |\n", False),
     ("orphan_5cell_caught", HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n\n"
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> passed |\n\n"
      "| P2 | Micro | broken | test | CLAIMED |\n", True),
     ("fenced_example_ignored",
      "```markdown\n| EX | Micro | demo | test | CLAIMED | |\n```\n\n" + HDR +
-     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11 -> passed |\n", False),
+     "| P1 | Micro | ok | test | EVIDENCED | run 2026-07-11: `pytest` -> passed |\n", False),
+    # v3.0 EVO-006: bare markers no longer read as an executed proof.
+    ("bare_date_and_passed_caught", HDR +
+     "| P1 | Micro | export works | inspect the export by hand | EVIDENCED | 2026-08-02 test passed |\n", True),
+    ("command_without_result_caught", HDR +
+     "| P1 | Micro | export works | `make export` | EVIDENCED | I ran the export command as required |\n", True),
+    ("gate_command_with_dated_result_ok", HDR +
+     "| P1 | Micro | export works | `make export` on the full dataset | EVIDENCED | 2026-08-02: 482 rows exported, 0 diff vs reference |\n", False),
+    ("bare_url_word_caught", HDR +
+     "| P1 | Micro | export works | run the export | EVIDENCED | see http docs for details |\n", True),
+    ("exit_code_ok", HDR +
+     "| P1 | Micro | export works | run the export | EVIDENCED | `pytest -q` exit=0, 12 passed |\n", False),
+    ("ci_run_url_ok", HDR +
+     "| P1 | Micro | CI green | the workflow run | EVIDENCED | https://github.com/o/r/actions/runs/1 conclusion=success |\n", False),
+    ("attestation_ok", HDR +
+     "| P1 | Micro | export works | run the export | EVIDENCED | attestation .wincreator/attestations/P1/x.json sha256=0123456789abcdef0123 |\n", False),
+    # v3.0 EVO-007: negative and non-runnable outcomes are representable.
+    ("disproven_blocks", HDR +
+     "| P1 | Micro | export never drops rows | full-dataset diff | DISPROVEN | `wincreator prove` 2026-08-02: `diff` -> exit=1, 3 rows missing |\n", True),
+    ("disproven_needs_execution", HDR +
+     "| P1 | Micro | export never drops rows | full-dataset diff | DISPROVEN | it seemed wrong to me honestly |\n", True),
+    ("superseded_ok", HDR +
+     "| P1 | Micro | export never drops rows | full-dataset diff | SUPERSEDED | superseded by P7 after the DISPROVEN run of 2026-08-02 |\n", False),
+    ("superseded_without_target_caught", HDR +
+     "| P1 | Micro | export never drops rows | full-dataset diff | SUPERSEDED | not relevant anymore, dropped it |\n", True),
+    ("blocked_ok", HDR +
+     "| P1 | Micro | SSO login works | end-to-end login run | BLOCKED | blocked by the IdP sandbox outage since 2026-08-01, ticket OPS-412 |\n", False),
+    ("blocked_without_dependency_caught", HDR +
+     "| P1 | Micro | SSO login works | end-to-end login run | BLOCKED | cannot do it right now 2026-08-01 |\n", True),
+    ("unknown_status_caught", HDR +
+     "| P1 | Micro | ok | test | ALMOST | run 2026-07-11: `pytest` -> passed |\n", True),
+]
+
+# v3.0: --strict-attestation is a separate suite (same texts, harsher mode).
+STRICT_TESTS = [
+    # (name, text, expect_violations: bool)
+    ("strict_rejects_handwritten_evidence", HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | `pytest -q` exit=0, 12 passed |\n", True),
+    ("strict_accepts_attestation", HDR +
+     "| P1 | Micro | ok | test | EVIDENCED | attestation .wincreator/attestations/P1/x.json sha256=0123456789abcdef0123 |\n", False),
 ]
 
 # v2.1 EVO-001: cover the --catches retro-loop checker in the same suite.
@@ -362,6 +521,14 @@ def self_test():
             failed += 1
         print(f"  [{status}] {name} (expected {'violations' if expect_bad else 'clean'}, "
               f"got {len(violations)})")
+    for name, text, expect_bad in STRICT_TESTS:
+        violations, _ = check_text(text, strict_attestation=True)
+        got_bad = bool(violations)
+        status = "PASS" if got_bad == expect_bad else "FAIL"
+        if status == "FAIL":
+            failed += 1
+        print(f"  [{status}] {name} (expected {'violations' if expect_bad else 'clean'}, "
+              f"got {len(violations)})")
     for name, text, expect_alive in CATCH_TESTS:
         alive, rows = check_catches_text(text)
         status = "PASS" if alive == expect_alive else "FAIL"
@@ -369,15 +536,25 @@ def self_test():
             failed += 1
         print(f"  [{status}] {name} (expected {'alive' if expect_alive else 'stale'}, "
               f"got {'alive' if alive else 'stale'})")
-    total = len(SELF_TESTS) + len(CATCH_TESTS)
+    total = len(SELF_TESTS) + len(STRICT_TESTS) + len(CATCH_TESTS)
     print(f"self-test: {total-failed}/{total} passed")
     return 2 if failed else 0
 
 
-if __name__ == "__main__":
-    args = sys.argv[1:]
+def main(argv):
+    args = list(argv)
     if args and args[0] == "--self-test":
-        sys.exit(self_test())
+        return self_test()
+    if args and args[0] == "--version":
+        print(f"ledger_check.py {VERSION}")
+        return 0
     if args and args[0] == "--catches":
-        sys.exit(check_catches(args[1] if len(args) > 1 else "SKEPTIC_CATCHES.md"))
-    sys.exit(check(args[0] if args else "PROOF_LEDGER.md"))
+        return check_catches(args[1] if len(args) > 1 else "SKEPTIC_CATCHES.md")
+    strict = "--strict-attestation" in args
+    if strict:
+        args.remove("--strict-attestation")
+    return check(args[0] if args else "PROOF_LEDGER.md", strict_attestation=strict)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

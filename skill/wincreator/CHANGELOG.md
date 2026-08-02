@@ -1,8 +1,58 @@
-# Changelog — skill-wincreator
+# Changelog — wincreator
 
 Version line of the skill itself (distinct from the repository release line
 in the root `CHANGELOG.md`). Semver: patch = clarification, minor = new
 rule/defense, major = protocol change.
+
+## [3.0.0] — 2026-08-02
+
+Major: the skill stops asking an agent to *describe* its proof and starts
+capturing it. Answers the external audit of 2026-08-02, whose central point
+was that a hand-written Evidence cell is a narrative, not an audit trail.
+The protocol change (four statuses → seven) is covered by that audit's
+explicit waiver of the status invariant.
+
+### Added
+- **`scripts/wincreator.py prove <ID> -- <command>`** — runs the gate and
+  writes the row from what happened: exit code, duration, sha256 of stdout /
+  stderr / `--file` artifacts, git commit + branch + dirty flag + remote,
+  platform, Python, hostname, CI marker, and a canonical sha256 digest of
+  the whole payload, optionally HMAC-SHA256 signed via
+  `WINCREATOR_SIGNING_KEY`. Exit code 0 → `EVIDENCED`, anything else →
+  `DISPROVEN`; there is no flag to override the verdict.
+- **`scripts/wincreator.py verify`** — re-hashes every attestation, log and
+  artifact, and cross-checks the ledger: a tampered log, a forged field, a
+  status hand-edited away from the captured verdict, or a rewritten captured
+  sentence all fail. Appending notes after the captured sentence is allowed.
+- **Three statuses**: `DISPROVEN` (the gate ran, the claim is false —
+  blocking, like `CLAIMED`), `SUPERSEDED` (replaced by a named successor
+  row), `BLOCKED` (a *named*, dated external dependency).
+- **`scripts/package_check.py`** — gates the Agent Skills packaging itself
+  (name lowercase-hyphenated and equal to the directory, description
+  present, SKILL.md budget, no dangling reference, `agents/openai.yaml`
+  complete). It is what caught `name: skill-wincreator` in a directory named
+  `Skill_WinCreator`.
+- **`agents/openai.yaml`** for OpenAI/Codex runtimes, and
+  `references/attestation.md` documenting the attestation schema, signing,
+  and what `verify` cannot catch.
+- **Three tiers** (Lite / Standard / Regulated) so ceremony scales with
+  stakes, plus a narrowed trigger description — the previous one fired on
+  essentially any multi-step technical task.
+- `ledger_check.py --strict-attestation`: every EVIDENCED/DISPROVEN row must
+  cite a captured attestation (the Regulated tier).
+
+### Changed
+- **Per-status evidence rules instead of one shared marker.** The old
+  `EXEC_MARKER` let a bare ISO date satisfy a `PENDING` row that was
+  supposed to carry a command. Now: EVIDENCED/DISPROVEN need an execution
+  trace (exit code, attestation digest, run URL, or a named command *with* a
+  dated/raw result); PENDING needs a concrete command; WAIVED needs a date
+  *and* the user's voice; SUPERSEDED a successor; BLOCKED a named blocker.
+  `2026-08-02 test passed` is no longer accepted as proof of execution.
+- Package renamed `Skill_WinCreator/` → `wincreator/` with
+  `name: wincreator`, to satisfy the Agent Skills name/directory rule.
+- `--self-test` grew from 20 to 36 cases; `wincreator.py` ships 26 of its
+  own and `package_check.py` 6.
 
 ## [2.5.0] — 2026-07-11
 
