@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
+  <title id="title">WinCreator proof flow</title>
+  <desc id="desc">Claim becomes ledger row, prove captures the gate, review decides evidence, ledger is machine-checked.</desc>
+  <defs>
+    <style>
+      .label { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; fill: #0f172a; }
+      .sub { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #475569; }
+      .title { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; fill: #0f172a; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; }
+      .box-accent { fill: #f8fafc; stroke: #0f766e; stroke-width: 1.75; }
+      .box-warn { fill: #fffbeb; stroke: #d97706; stroke-width: 1.5; }
+      .arrow { stroke: #64748b; stroke-width: 1.75; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect width="960" height="280" fill="#ffffff"/>
+  <text x="32" y="36" class="title">WinCreator — claim → capture → review → gate</text>
+
+  <!-- 1 Claim -->
+  <rect x="32" y="72" width="150" height="88" rx="10" class="box"/>
+  <text x="107" y="108" text-anchor="middle" class="label">1. Claim</text>
+  <text x="107" y="128" text-anchor="middle" class="sub">Ledger row</text>
+  <text x="107" y="144" text-anchor="middle" class="sub">Status: CLAIMED</text>
+
+  <path d="M182 116 H230" class="arrow"/>
+
+  <!-- 2 Prove -->
+  <rect x="230" y="72" width="150" height="88" rx="10" class="box-accent"/>
+  <text x="305" y="108" text-anchor="middle" class="label">2. Prove</text>
+  <text x="305" y="128" text-anchor="middle" class="sub">Run real command</text>
+  <text x="305" y="144" text-anchor="middle" class="sub">CAPTURED_*</text>
+
+  <path d="M380 116 H428" class="arrow"/>
+
+  <!-- 3 Review -->
+  <rect x="428" y="72" width="150" height="88" rx="10" class="box-accent"/>
+  <text x="503" y="108" text-anchor="middle" class="label">3. Review</text>
+  <text x="503" y="128" text-anchor="middle" class="sub">Independent Skeptic</text>
+  <text x="503" y="144" text-anchor="middle" class="sub">EVIDENCED / …</text>
+
+  <path d="M578 116 H626" class="arrow"/>
+
+  <!-- 4 Gate -->
+  <rect x="626" y="72" width="150" height="88" rx="10" class="box"/>
+  <text x="701" y="108" text-anchor="middle" class="label">4. Ledger gate</text>
+  <text x="701" y="128" text-anchor="middle" class="sub">ledger_check.py</text>
+  <text x="701" y="144" text-anchor="middle" class="sub">CLEAN or block</text>
+
+  <path d="M776 116 H824" class="arrow"/>
+
+  <!-- Done -->
+  <rect x="824" y="72" width="104" height="88" rx="10" class="box"/>
+  <text x="876" y="116" text-anchor="middle" class="label">Report up</text>
+  <text x="876" y="136" text-anchor="middle" class="sub">proven only</text>
+
+  <!-- Note -->
+  <rect x="32" y="192" width="896" height="56" rx="8" class="box-warn"/>
+  <text x="52" y="218" class="label">Builder never grades own work. Capture ≠ proof. Unobserved verification does not exist.</text>
+  <text x="52" y="236" class="sub">Standard / Regulated require separate review · Lite may auto-approve when stakes are low</text>
+</svg>

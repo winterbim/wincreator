@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Before and after WinCreator</title>
+  <desc id="desc">Left: agent self-grades with assertion. Right: captured command and independent review.</desc>
+  <defs>
+    <style>
+      .h { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; fill: #0f172a; }
+      .t { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; fill: #0f172a; }
+      .s { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 12px; fill: #475569; }
+      .panel { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; }
+      .bad { fill: #fef2f2; stroke: #f87171; stroke-width: 1.5; }
+      .good { fill: #f0fdf4; stroke: #34d399; stroke-width: 1.5; }
+      .chip-bad { fill: #fee2e2; }
+      .chip-good { fill: #dcfce7; }
+    </style>
+  </defs>
+  <rect width="960" height="360" fill="#ffffff"/>
+  <text x="32" y="36" class="h">Assertion vs proof</text>
+
+  <!-- BEFORE -->
+  <rect x="32" y="56" width="430" height="272" rx="12" class="panel"/>
+  <rect x="52" y="76" width="72" height="24" rx="6" class="chip-bad"/>
+  <text x="88" y="93" text-anchor="middle" class="s">Before</text>
+  <text x="52" y="128" class="t">Agent: “Tests pass. Done.”</text>
+  <text x="52" y="156" class="s">• Same context wrote and graded the work</text>
+  <text x="52" y="176" class="s">• No raw command output retained</text>
+  <text x="52" y="196" class="s">• Claim and “proof” are the same story</text>
+  <text x="52" y="216" class="s">• Silent gaps ship as confidence</text>
+  <rect x="52" y="244" width="390" height="56" rx="8" class="bad"/>
+  <text x="72" y="268" class="t">Optimism leak</text>
+  <text x="72" y="288" class="s">Unverified assertion treated as evidence</text>
+
+  <!-- AFTER -->
+  <rect x="498" y="56" width="430" height="272" rx="12" class="panel"/>
+  <rect x="518" y="76" width="64" height="24" rx="6" class="chip-good"/>
+  <text x="550" y="93" text-anchor="middle" class="s">After</text>
+  <text x="518" y="128" class="t">Claim → prove → review → gate</text>
+  <text x="518" y="156" class="s">• Command actually executed and captured</text>
+  <text x="518" y="176" class="s">• Builder and Skeptic roles separated</text>
+  <text x="518" y="196" class="s">• Ledger statuses are machine-checkable</text>
+  <text x="518" y="216" class="s">• Unproven work cannot report upward</text>
+  <rect x="518" y="244" width="390" height="56" rx="8" class="good"/>
+  <text x="538" y="268" class="t">Evidence bound to the claim</text>
+  <text x="538" y="288" class="s">CAPTURED_* then EVIDENCED / INSUFFICIENT / DISPROVEN</text>
+</svg>

@@ -1,14 +1,147 @@
 # WinCreator
 
+**Stop your AI agent from lying about tests.**
+
 WinCreator structures consequential engineering work as proof-gated loops.
 It keeps claims in a Markdown ledger, captures the command that tested each
 claim, and separates a mechanical command result from an independent review.
 
 [![ci — default branch](https://github.com/winterbim/wincreator/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/winterbim/wincreator/actions/workflows/ci.yml?query=branch%3Amaster)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/winterbim/wincreator)](https://github.com/winterbim/wincreator/releases/latest)
 
 The CI badge reports the default branch only. It is not evidence that an open
 pull request is green; use that PR's checks for the PR state.
+
+![Assertion vs proof](docs/assets/before-after.svg)
+
+## Install in one command
+
+```bash
+npx skills add winterbim/wincreator
+```
+
+That installs the skill for agents that support the `skills` CLI.
+Then confirm the active version:
+
+```bash
+# should report 3.0.0
+cat ~/.claude/skills/wincreator/VERSION   # Claude Code path
+# or the equivalent path used by your agent
+```
+
+### Other install paths
+
+**Claude Code (manual copy)**
+
+```bash
+git clone https://github.com/winterbim/wincreator.git
+mkdir -p ~/.claude/skills
+cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
+python3 ~/.claude/skills/wincreator/scripts/ledger_check.py --self-test
+python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
+```
+
+**ChatGPT / manual package**
+
+Build or download `skill.zip`, then upload that file. It contains a single
+root directory, `wincreator/`, and a single `SKILL.md`.
+
+```bash
+./tools/build_package.sh
+# then upload dist/.../skill.zip
+```
+
+Release assets: [v3.0.0](https://github.com/winterbim/wincreator/releases/tag/v3.0.0).
+
+**Migrating from v1/v2**
+
+```bash
+python3 tools/migrate_v2_to_v3.py
+```
+
+The migration tool backs up known old installations, removes only those known
+directories, installs v3, runs the validators, and prints the active version.
+
+## Why this exists
+
+Every agent-assisted engineering session degrades the same three ways:
+
+1. **Optimism leak** — the same context that wrote the code grades its own work.
+2. **Context rot** — early constraints get lost as the session grows.
+3. **Stuck loops** — a failing check is attacked at the wrong level again and again.
+
+WinCreator counters each one mechanically: Proof Ledger + Builder/Skeptic
+separation, the Loop Panel, and the Two-Failure Rule. It is domain-agnostic
+(no language or framework assumed) and works with any agent that can follow a
+skill protocol.
+
+![Prove → review → gate](docs/assets/flow-prove-review.svg)
+
+## Quick start
+
+### 1. Minimal sandbox (copy-paste)
+
+A ready-to-run toy claim lives in [`examples/minimal/`](examples/minimal/).
+Requires a clone of this repository (or an installed skill path).
+
+```bash
+cd examples/minimal
+# From a clone of this repo:
+export WC=../../skill/wincreator
+# After install only (no clone of scripts into your project):
+# export WC=~/.claude/skills/wincreator
+
+python3 "$WC/scripts/wincreator.py" prove M1 \
+  --tier lite --auto-approve-lite \
+  --builder demo-builder \
+  --ledger PROOF_LEDGER.md \
+  -- python3 check_example.py
+
+python3 "$WC/scripts/ledger_check.py" PROOF_LEDGER.md
+```
+
+See [`examples/minimal/README.md`](examples/minimal/README.md) for the Standard
+capture → review path and the intentional failure demo.
+
+### 2. Lite tier in your own project
+
+Use a **new ledger file** in your project (do not reuse the repo's
+`PROOF_LEDGER.md`, which already contains other claim IDs).
+
+```markdown
+# my-PROOF_LEDGER.md
+| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
+|----|-------|-------|------------------------|--------|----------|
+| Q1 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
+```
+
+```bash
+# Prefer the installed skill path after `npx skills add` / manual copy:
+export WC=~/.claude/skills/wincreator
+# Or, from a clone of this repository only:
+# export WC=./skill/wincreator
+
+python3 "$WC/scripts/wincreator.py" prove Q1 \
+  --tier lite --auto-approve-lite \
+  --builder builder-01 \
+  --ledger my-PROOF_LEDGER.md \
+  -- python3 check_parser.py
+```
+
+### 3. Real session transcript
+
+A non-fictional Micro loop where the Skeptic caught a missing `ValueError`
+path after five green tests:
+
+→ [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md)
+
+## Tiers
+
+![Lite · Standard · Regulated](docs/assets/tiers.svg)
+
+Ceremony must stay proportional to stakes. If you cannot name why the task
+needs Standard, it is a Lite task.
 
 ## What changed in v3
 
@@ -141,57 +274,6 @@ wincreator.skill.sha256
 `skill.zip` and `wincreator.skill` are byte-identical aliases. Their only
 Skill entry is `wincreator/SKILL.md`, and the archive must remain below 25 MiB.
 
-## Installation
-
-These commands use only the v3 path and name. The GitHub release command is
-appropriate after `v3.0.0` is actually published; until then, do not treat
-`releases/latest` as proof of v3 availability.
-
-### Git / Claude Code
-
-```bash
-git clone https://github.com/winterbim/wincreator.git
-mkdir -p ~/.claude/skills
-cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
-python3 ~/.claude/skills/wincreator/scripts/ledger_check.py --self-test
-python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
-```
-
-### npx skills
-
-```bash
-npx skills add winterbim/wincreator
-```
-
-After installation, confirm that exactly one discovered SKILL.md has
-`name: wincreator` and that `VERSION` contains `3.0.0`.
-
-### ChatGPT / manual package
-
-Build or download `skill.zip`, then upload that file. It contains a single
-root directory, `wincreator/`, and a single `SKILL.md`. The release asset is
-not considered official until the v3 tag and GitHub release exist and its
-checksum matches `skill.zip.sha256`.
-
-### Safe migration from v1/v2
-
-The migration tool backs up known old installations, removes only those known
-directories, installs v3, runs the validators, and prints the active version:
-
-```bash
-python3 tools/migrate_v2_to_v3.py
-```
-
-The explicit manual equivalent is:
-
-```bash
-rm -rf ~/.claude/skills/Skill_WinCreator
-rm -rf ~/.claude/skills/skill-wincreator
-cp -r skill/wincreator ~/.claude/skills/wincreator
-```
-
-Prefer the migration tool when an old installation may contain user files.
-
 ## Development gates
 
 ```bash
@@ -209,6 +291,16 @@ CI runs these gates on Ubuntu, Windows, and macOS with Python 3.10, 3.11,
 OpenAI Skill Creator validator plus the pinned Agent Skills reference
 validator in a separate job.
 
+## Learn more
+
+| Resource | Purpose |
+|----------|---------|
+| [`examples/minimal/`](examples/minimal/) | Copy-paste sandbox |
+| [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | Real session + Skeptic catch |
+| [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | Full protocol |
+| [`docs/assets/`](docs/assets/) | Diagrams (SVG) |
+| [Releases](https://github.com/winterbim/wincreator/releases) | Packages and notes |
+
 ## Publication status
 
 The authoritative publication state is GitHub, not this paragraph:
@@ -217,9 +309,9 @@ The authoritative publication state is GitHub, not this paragraph:
 - open PR checks: <https://github.com/winterbim/wincreator/pulls>;
 - latest release: <https://github.com/winterbim/wincreator/releases/latest>.
 
-Do not infer a v3 tag, release, assets, `latest` state, or successful public
-installation from the source tree alone. Those claims are evidenced only
-after the corresponding GitHub operations and clean-clone checks complete.
+Do not infer a successful public installation from the source tree alone.
+Those claims are evidenced only after the corresponding GitHub operations and
+clean-clone checks complete.
 
 ## License
 
