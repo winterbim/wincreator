@@ -9,6 +9,25 @@ frontmatter intentionally contains only `name` and `description`. A tag or
 release is authoritative only after it exists on GitHub. The v2 development
 history remains available in Git and is not restated here.
 
+## [3.0.1] — 2026-08-25
+
+Close-out after the 2026-08-25 audit: waiting is not a freeze, the live
+retro-loop file is CI-gated, and operator surfaces match v3.
+
+### Added
+- SKILL.md: re-check `PENDING`/`BLOCKED` at Meso close; re-derive documentary
+  claims at read time (EVO-008, catches 2026-08-02 and 2026-08-25).
+- CI and `tools/run_release_gate.py` run `--catches` on the live
+  `SKEPTIC_CATCHES.md`, not only self-test fixtures.
+- `package_check.py` requires a semver `VERSION` file.
+
+### Changed
+- Tool `--version` reads `skill/wincreator/VERSION` instead of a hardcoded
+  string.
+- Surgeon, `CLAUDE.md`, and `CONTRIBUTING.md` aligned on 8 statuses, the
+  `VERSION` file, and the 24 000-character SKILL.md budget.
+- README no longer freezes a release tag or a version numeral in install copy.
+
 ## [3.0.0] — 2026-08-02
 
 Claim-bound capture and independent review. `wincreator prove` executes a
@@ -63,5 +82,6 @@ First public release.
   on every push — the repository verifies its own `PROOF_LEDGER.md`.
 - `Skill_WinCreator.skill` release asset for manual installation.
 
+[3.0.1]: https://github.com/winterbim/wincreator/releases/tag/v3.0.1
 [3.0.0]: https://github.com/winterbim/wincreator/releases/tag/v3.0.0
 [1.0.0]: https://github.com/winterbim/wincreator/releases/tag/v1.0.0

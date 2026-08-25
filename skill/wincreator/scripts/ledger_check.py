@@ -28,7 +28,7 @@ v2.3 EVO-003: --catches is schema-gated like the ledger parser, so a foreign
 table with an ISO date no longer reads as ALIVE (fix B carried to the newer
 surface — the exact "verifier shipped unverified" class, recurring).
 
-v3.0 EVO-006/007/008 (breaking: the status set and the evidence rules change):
+v3.0 EVO-007 (breaking: the status set and the evidence rules change; EVO-006 declined):
   E. three statuses added — DISPROVEN (the gate ran and the claim is FALSE),
      SUPERSEDED (the claim was replaced by a reformulated one), BLOCKED (the
      gate cannot run because of a named external dependency). Before v3 a
@@ -56,8 +56,18 @@ Exit codes: 0 clean/alive | 1 violations/stale | 2 file/table missing or self-te
 """
 import re
 import sys
+from pathlib import Path
 
-VERSION = "3.0.0"
+
+def _tool_version():
+    path = Path(__file__).resolve().parent.parent / "VERSION"
+    value = path.read_text(encoding="utf-8").strip()
+    if not value:
+        raise RuntimeError(f"empty VERSION file: {path}")
+    return value
+
+
+VERSION = _tool_version()
 
 # Statuses that may legitimately appear in a ledger.
 VALID_STATUSES = {

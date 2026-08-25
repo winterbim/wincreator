@@ -10,7 +10,7 @@ that skill root unless stated otherwise; project-level machinery
 - Chaque claim est validée par le subagent `wincreator-skeptic` (jamais d'auto-notation).
 - À chaque verdict INSUFFICIENT et à chaque fermeture de boucle Meso+ : invoquer `wincreator-retro-analyst`.
 - Quand EVOLUTION_QUEUE.md contient ≥1 proposition avec pattern confirmé, OU tous les 10 catches, OU sur demande : invoquer `wincreator-skill-surgeon` (une proposition = une boucle Meso).
-- Jamais de réécriture du skill hors de ce circuit. Les invariants (les 8 statuts, Builder/Skeptic, no-upward-propagation, Two-Failure) ne bougent qu'avec waiver explicite de l'utilisateur. Le passage de 4 à 7 statuts (`DISPROVEN`, `SUPERSEDED`, `BLOCKED`) est couvert par le waiver de l'audit utilisateur du 2026-08-02; v3 rend aussi le verdict de revue `INSUFFICIENT` explicite et bloquant au lieu de le confondre avec `PENDING`.
+- Jamais de réécriture du skill hors de ce circuit. Les invariants (les 8 statuts, Builder/Skeptic, no-upward-propagation, Two-Failure) ne bougent qu'avec waiver explicite de l'utilisateur. Le passage de 4 à 8 statuts (`DISPROVEN`, `SUPERSEDED`, `BLOCKED`, `INSUFFICIENT`) est couvert par le waiver de l'audit du 2026-08-02.
 - Une preuve se capture puis se révise : utiliser `wincreator.py prove <ID> -- <commande>`, puis `wincreator.py review <ID> --verdict ... --reviewer ...`. Un code retour nul ne devient pas EVIDENCED sans review en Standard/Regulated.
 
 ### Fichiers de la boucle (chemins réels dans ce dépôt)
