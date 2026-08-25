@@ -82,11 +82,15 @@ skill protocol.
 
 ### 1. Minimal sandbox (copy-paste)
 
-A ready-to-run toy claim lives in [`examples/minimal/`](examples/minimal/):
+A ready-to-run toy claim lives in [`examples/minimal/`](examples/minimal/).
+Requires a clone of this repository (or an installed skill path).
 
 ```bash
 cd examples/minimal
-export WC=../../skill/wincreator   # or ~/.claude/skills/wincreator
+# From a clone of this repo:
+export WC=../../skill/wincreator
+# After install only (no clone of scripts into your project):
+# export WC=~/.claude/skills/wincreator
 
 python3 "$WC/scripts/wincreator.py" prove M1 \
   --tier lite --auto-approve-lite \
@@ -102,16 +106,26 @@ capture → review path and the intentional failure demo.
 
 ### 2. Lite tier in your own project
 
+Use a **new ledger file** in your project (do not reuse the repo's
+`PROOF_LEDGER.md`, which already contains other claim IDs).
+
 ```markdown
+# my-PROOF_LEDGER.md
 | ID | Level | Claim | Gate (what proves it) | Status | Evidence |
 |----|-------|-------|------------------------|--------|----------|
-| P2 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
+| Q1 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
 ```
 
 ```bash
-python3 skill/wincreator/scripts/wincreator.py prove P2 \
+# Prefer the installed skill path after `npx skills add` / manual copy:
+export WC=~/.claude/skills/wincreator
+# Or, from a clone of this repository only:
+# export WC=./skill/wincreator
+
+python3 "$WC/scripts/wincreator.py" prove Q1 \
   --tier lite --auto-approve-lite \
   --builder builder-01 \
+  --ledger my-PROOF_LEDGER.md \
   -- python3 check_parser.py
 ```
 
