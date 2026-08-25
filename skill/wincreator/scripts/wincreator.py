@@ -25,7 +25,15 @@ import time
 import uuid
 
 
-VERSION = "3.0.0"
+def _tool_version():
+    path = Path(__file__).resolve().parent.parent / "VERSION"
+    value = path.read_text(encoding="utf-8").strip()
+    if not value:
+        raise RuntimeError(f"empty VERSION file: {path}")
+    return value
+
+
+VERSION = _tool_version()
 ATTESTATION_SCHEMA = "wincreator.attestation/v1"
 REVIEW_SCHEMA = "wincreator.review/v1"
 DEFAULT_ATTEST_DIR = ".wincreator/attestations"

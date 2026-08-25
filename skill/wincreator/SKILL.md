@@ -170,6 +170,13 @@ what its status requires. Run it as the final mechanical gate of every Meso
 loop, and in CI if the project has one. Full spec:
 `references/proof-ledger.md`.
 
+Waiting is not a freeze. Before closing a Meso+ loop, re-check every
+`PENDING` and `BLOCKED` row: if the named command can now run or the named
+blocker has lifted, re-run the gate. `ledger_check` exit 0 on those statuses
+means the wait is well-formed, not that the object is still blocked.
+Documentary claims (counts, versions, paths, surfaces) obey the same law:
+re-derive them from the object at read time.
+
 ## Capture first, review second
 
 A hand-written Evidence cell is still a story about a proof. Execute the gate
@@ -318,7 +325,8 @@ evolution, and now the gate can say so.
    Panel.
 6. Gate failed once → iterate. Failed twice → Two-Failure level audit.
 7. Gate captured pass + review EVIDENCED → report up explicitly with what was proven.
-8. Proof not executable → PENDING, never assumed.
+8. Proof not executable → PENDING, never assumed. Re-check PENDING/BLOCKED
+   at Meso close: waiting is not a freeze.
 9. End of Meso loop: `python3 scripts/ledger_check.py` as the final
    mechanical gate (`--self-test` first if the script is newly installed;
    `--strict-attestation` in the Regulated tier).

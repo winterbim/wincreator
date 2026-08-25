@@ -22,10 +22,9 @@ npx skills add winterbim/wincreator
 ```
 
 That installs the skill for agents that support the `skills` CLI.
-Then confirm the active version:
+Then confirm the active version matches `skill/wincreator/VERSION`:
 
 ```bash
-# should report 3.0.0
 cat ~/.claude/skills/wincreator/VERSION   # Claude Code path
 # or the equivalent path used by your agent
 ```
@@ -52,7 +51,7 @@ root directory, `wincreator/`, and a single `SKILL.md`.
 # then upload dist/.../skill.zip
 ```
 
-Release assets: [v3.0.0](https://github.com/winterbim/wincreator/releases/tag/v3.0.0).
+Release assets: [latest](https://github.com/winterbim/wincreator/releases/latest).
 
 **Migrating from v1/v2**
 
@@ -283,6 +282,7 @@ python3 skill/wincreator/scripts/wincreator.py --self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
+python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
 ./tools/build_package.sh
 ```
 

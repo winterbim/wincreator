@@ -12,6 +12,8 @@ python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
 python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
+python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v3-proof-capture.md
+python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
 ```
 
 CI runs all of these for every pull request and for pushes to `master`
@@ -27,7 +29,7 @@ python3 skill/wincreator/scripts/wincreator.py review P-XX \
   --verdict evidenced --reviewer skeptic-id
 ```
 
-`CLAIMED` and `DISPROVEN` rows do not merge.
+`CLAIMED`, `DISPROVEN`, and `INSUFFICIENT` rows do not merge. `PENDING` and `BLOCKED` may merge only while the named wait is still true — re-check them before calling the loop done.
 
 ## 2. A Skeptic pass in the PR description
 

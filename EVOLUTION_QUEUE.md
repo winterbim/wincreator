@@ -158,8 +158,49 @@ QUEUED → APPLIED (version, date) | REJECTED (motif).
   n'ait été relâchée ; `PROOF_LEDGER-v3-proof-capture.md` est rempli par la
   distingue les preuves locales des gates de publication encore bloquées.
 - **Limite assumée** : l'attestation est tamper-*evident*, pas tamper-*proof*
-  (HMAC = possession de clé). Consignée en ligne V13 `BLOCKED` du ledger v3,
-  dépendance externe nommée (Sigstore / in-toto + log de transparence).
+  (HMAC = possession de clé). Documentée dans
+  `skill/wincreator/references/attestation.md` (Signing limits), dépendance
+  externe nommée (Sigstore / in-toto + log de transparence).
+
+## EVO-008 — re-vérifier PENDING/BLOCKED et les claims documentaires (waiting ≠ freeze)
+
+- **Statut** : APPLIED (v3.0.1, 2026-08-25)
+- **Pattern CONFIRMÉ** : *claim documentaire / ledger périmée par l'évolution
+  de son propre objet* — une phrase vraie à l'écriture (prose ou statut
+  d'attente) n'est jamais re-dérivée de l'objet une fois celui-ci bougé.
+  Occurrences datées, 2 tâches distinctes :
+  1. 2026-08-02 — README « 91 lines » : vrai à la rédaction, faux dès v2.1 ;
+     aucune gate ne relisait la prose.
+  2. 2026-08-25 — `PROOF_LEDGER-v3-proof-capture.md` ligne V3-08 restée
+     `BLOCKED` (« no merge, tag, or release is claimed ») après merge du
+     PR #4 (2026-08-02), tag `v3.0.0` et latest GitHub release ;
+     `ledger_check` exit 0 car PENDING/BLOCKED sont non-bloquants.
+  EVO-007 a corrigé l'instance README et gaté l'emballage ; il n'a pas
+  fermé la classe : le gel d'un statut d'attente après levée du blocker
+  est le même trou, déplacé.
+- **Cible** : `SKILL.md` (section Proof Ledger + protocol summary item 8)
+- **Patch proposé** : insérer après le paragraphe `ledger_check` de
+  « The Proof Ledger (Meso+ tasks) » le paragraphe suivant, tel quel :
+
+  Waiting is not a freeze. Before closing a Meso+ loop, re-check every `PENDING` and `BLOCKED` row: if the named command can now run or the named blocker has lifted, re-run the gate. `ledger_check` exit 0 on those statuses means the wait is well-formed, not that the object is still blocked. Documentary claims (counts, versions, paths, surfaces) obey the same law: re-derive them from the object at read time.
+
+  Et remplacer la ligne de résumé
+  `8. Proof not executable → PENDING, never assumed.`
+  par
+  `8. Proof not executable → PENDING, never assumed. Re-check PENDING/BLOCKED at Meso close: waiting is not a freeze.`
+
+  Ne PAS rendre PENDING/BLOCKED bloquants dans `ledger_check.py` : l'attente
+  honnête doit rester exit 0. Le trou est sémantique (re-vérifier le
+  blocker), pas structurel (forme de la cellule).
+- **Coût** : +475 caractères sur `SKILL.md` (408 paragraphe + 2 newline + 65
+  sur l'item 8).
+- **Test de véracité** : (1) après apply, `SKILL.md` contient « Waiting is
+  not a freeze » et l'item 8 étendu ; (2) attaque Skeptic documentée, pas
+  un nouveau SELF_TEST parser : un ledger dont une ligne BLOCKED nomme un
+  blocker observablement levé (`gh release view` / tag présent) doit
+  recevoir INSUFFICIENT si elle reste BLOCKED — c'est exactement V3-08
+  au 2026-08-25. Ne pas ajouter de cas `--self-test` qui fail un BLOCKED
+  bien formé : ça casserait l'invariant d'attente honnête.
 
 ## Différé (loggé, PAS opéré ce cycle — retenue délibérée)
 

@@ -12,11 +12,21 @@ import sys
 import tempfile
 
 
-VERSION = "3.0.0"
+def _tool_version():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "VERSION")
+    with open(path, encoding="utf-8") as handle:
+        value = handle.read().strip()
+    if not value:
+        raise RuntimeError("VERSION file is empty")
+    return value
+
+
+VERSION = _tool_version()
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 MAX_NAME = 64
 MAX_DESCRIPTION = 1024
 MAX_SKILL_CHARS = 24000
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 ALLOWED_FRONTMATTER = {"name", "description"}
 LINK_RE = re.compile(r"(?:\]\(|`)((?:references|scripts|assets|agents|schemas)/[\w./-]+)")
 OPENAI_REQUIRED = {"display_name", "short_description", "default_prompt"}
@@ -105,6 +115,13 @@ def check_package(package_dir):
         problems.append("SKILL.md description is missing or exceeds 1024 characters")
     if len(text) > MAX_SKILL_CHARS:
         problems.append(f"SKILL.md is {len(text)} characters (policy limit {MAX_SKILL_CHARS})")
+    version_path = os.path.join(package_dir, "VERSION")
+    if not os.path.isfile(version_path):
+        problems.append("VERSION file missing")
+    else:
+        packaged_version = open(version_path, encoding="utf-8").read().strip()
+        if not VERSION_RE.fullmatch(packaged_version):
+            problems.append("VERSION must be semver X.Y.Z")
     for relative in sorted(set(LINK_RE.findall(text))):
         if not os.path.exists(os.path.join(package_dir, relative)):
             problems.append(f"SKILL.md points at a missing path: {relative}")
@@ -145,8 +162,12 @@ def self_test():
         package = os.path.join(directory, "demo")
         os.makedirs(os.path.join(package, "agents"))
         open(os.path.join(package, "SKILL.md"), "w", encoding="utf-8").write(valid_skill)
+        open(os.path.join(package, "VERSION"), "w", encoding="utf-8").write("1.2.3\n")
         open(os.path.join(package, "agents", "openai.yaml"), "w", encoding="utf-8").write(valid_openai)
         results.append(("valid_package", not check_package(package)))
+        os.remove(os.path.join(package, "VERSION"))
+        results.append(("missing_version", any("VERSION file missing" in item for item in check_package(package))))
+        open(os.path.join(package, "VERSION"), "w", encoding="utf-8").write("1.2.3\n")
         open(os.path.join(package, "agents", "openai.yaml"), "w", encoding="utf-8").write(
             "name: Demo\ndescription: old\nprompt: old\n"
         )

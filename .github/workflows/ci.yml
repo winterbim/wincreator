@@ -46,6 +46,8 @@ jobs:
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v2-install.md
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-evolution.md
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v3-proof-capture.md
+      - name: Check live retro-loop catches
+        run: python skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
       - name: Build package on this platform
         run: python tools/build_package.py --source skill/wincreator dist
       - uses: actions/upload-artifact@v4

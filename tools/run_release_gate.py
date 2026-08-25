@@ -25,8 +25,15 @@ def main():
         "PROOF_LEDGER.md",
         "PROOF_LEDGER-v2-install.md",
         "PROOF_LEDGER-evolution.md",
+        "PROOF_LEDGER-v3-proof-capture.md",
     ):
         run([PYTHON, "skill/wincreator/scripts/ledger_check.py", ledger])
+    run([
+        PYTHON,
+        "skill/wincreator/scripts/ledger_check.py",
+        "--catches",
+        "skill/wincreator/SKEPTIC_CATCHES.md",
+    ])
     run([PYTHON, "-m", "pytest", "-q"])
     run([PYTHON, "tools/build_package.py", "--source", "skill/wincreator", "dist"])
     print("SOURCE RELEASE GATE: PASS")
