@@ -1,5 +1,7 @@
 # WinCreator
 
+**Stop your AI agent from lying about tests.**
+
 WinCreator structures consequential engineering work as proof-gated loops.
 It keeps claims in a Markdown ledger, captures the command that tested each
 claim, and separates a mechanical command result from an independent review.
@@ -9,6 +11,84 @@ claim, and separates a mechanical command result from an independent review.
 
 The CI badge reports the default branch only. It is not evidence that an open
 pull request is green; use that PR's checks for the PR state.
+
+## Install in one command
+
+```bash
+npx skills add winterbim/wincreator
+```
+
+That installs the skill for agents that support the `skills` CLI.
+Then confirm the active version:
+
+```bash
+# should report 3.0.0
+cat ~/.claude/skills/wincreator/VERSION   # Claude Code path
+# or the equivalent path used by your agent
+```
+
+### Other install paths
+
+**Claude Code (manual copy)**
+
+```bash
+git clone https://github.com/winterbim/wincreator.git
+mkdir -p ~/.claude/skills
+cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
+python3 ~/.claude/skills/wincreator/scripts/ledger_check.py --self-test
+python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
+```
+
+**ChatGPT / manual package**
+
+Build or download `skill.zip`, then upload that file. It contains a single
+root directory, `wincreator/`, and a single `SKILL.md`.
+
+```bash
+./tools/build_package.sh
+# then upload dist/.../skill.zip
+```
+
+**Migrating from v1/v2**
+
+```bash
+python3 tools/migrate_v2_to_v3.py
+```
+
+The migration tool backs up known old installations, removes only those known
+directories, installs v3, runs the validators, and prints the active version.
+
+## Why this exists
+
+Every agent-assisted engineering session degrades the same three ways:
+
+1. **Optimism leak** — the same context that wrote the code grades its own work.
+2. **Context rot** — early constraints get lost as the session grows.
+3. **Stuck loops** — a failing check is attacked at the wrong level again and again.
+
+WinCreator counters each one mechanically: Proof Ledger + Builder/Skeptic
+separation, the Loop Panel, and the Two-Failure Rule. It is domain-agnostic
+(no language or framework assumed) and works with any agent that can follow a
+skill protocol.
+
+## Quick start (Lite tier)
+
+Add a claim to a ledger, run the gate, then review:
+
+```markdown
+| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
+|----|-------|-------|------------------------|--------|----------|
+| P2 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
+```
+
+```bash
+python3 skill/wincreator/scripts/wincreator.py prove P2 \
+  --tier lite --auto-approve-lite \
+  --builder builder-01 \
+  -- python3 check_parser.py
+```
+
+For Standard / Regulated work, capture and review are separate steps (see below).
 
 ## What changed in v3
 
@@ -140,57 +220,6 @@ wincreator.skill.sha256
 
 `skill.zip` and `wincreator.skill` are byte-identical aliases. Their only
 Skill entry is `wincreator/SKILL.md`, and the archive must remain below 25 MiB.
-
-## Installation
-
-These commands use only the v3 path and name. The GitHub release command is
-appropriate after `v3.0.0` is actually published; until then, do not treat
-`releases/latest` as proof of v3 availability.
-
-### Git / Claude Code
-
-```bash
-git clone https://github.com/winterbim/wincreator.git
-mkdir -p ~/.claude/skills
-cp -r wincreator/skill/wincreator ~/.claude/skills/wincreator
-python3 ~/.claude/skills/wincreator/scripts/ledger_check.py --self-test
-python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
-```
-
-### npx skills
-
-```bash
-npx skills add winterbim/wincreator
-```
-
-After installation, confirm that exactly one discovered SKILL.md has
-`name: wincreator` and that `VERSION` contains `3.0.0`.
-
-### ChatGPT / manual package
-
-Build or download `skill.zip`, then upload that file. It contains a single
-root directory, `wincreator/`, and a single `SKILL.md`. The release asset is
-not considered official until the v3 tag and GitHub release exist and its
-checksum matches `skill.zip.sha256`.
-
-### Safe migration from v1/v2
-
-The migration tool backs up known old installations, removes only those known
-directories, installs v3, runs the validators, and prints the active version:
-
-```bash
-python3 tools/migrate_v2_to_v3.py
-```
-
-The explicit manual equivalent is:
-
-```bash
-rm -rf ~/.claude/skills/Skill_WinCreator
-rm -rf ~/.claude/skills/skill-wincreator
-cp -r skill/wincreator ~/.claude/skills/wincreator
-```
-
-Prefer the migration tool when an old installation may contain user files.
 
 ## Development gates
 
