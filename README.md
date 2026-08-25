@@ -8,9 +8,12 @@ claim, and separates a mechanical command result from an independent review.
 
 [![ci — default branch](https://github.com/winterbim/wincreator/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/winterbim/wincreator/actions/workflows/ci.yml?query=branch%3Amaster)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/winterbim/wincreator)](https://github.com/winterbim/wincreator/releases/latest)
 
 The CI badge reports the default branch only. It is not evidence that an open
 pull request is green; use that PR's checks for the PR state.
+
+![Assertion vs proof](docs/assets/before-after.svg)
 
 ## Install in one command
 
@@ -49,6 +52,8 @@ root directory, `wincreator/`, and a single `SKILL.md`.
 # then upload dist/.../skill.zip
 ```
 
+Release assets: [v3.0.0](https://github.com/winterbim/wincreator/releases/tag/v3.0.0).
+
 **Migrating from v1/v2**
 
 ```bash
@@ -71,9 +76,31 @@ separation, the Loop Panel, and the Two-Failure Rule. It is domain-agnostic
 (no language or framework assumed) and works with any agent that can follow a
 skill protocol.
 
-## Quick start (Lite tier)
+![Prove → review → gate](docs/assets/flow-prove-review.svg)
 
-Add a claim to a ledger, run the gate, then review:
+## Quick start
+
+### 1. Minimal sandbox (copy-paste)
+
+A ready-to-run toy claim lives in [`examples/minimal/`](examples/minimal/):
+
+```bash
+cd examples/minimal
+export WC=../../skill/wincreator   # or ~/.claude/skills/wincreator
+
+python3 "$WC/scripts/wincreator.py" prove M1 \
+  --tier lite --auto-approve-lite \
+  --builder demo-builder \
+  --ledger PROOF_LEDGER.md \
+  -- python3 check_example.py
+
+python3 "$WC/scripts/ledger_check.py" PROOF_LEDGER.md
+```
+
+See [`examples/minimal/README.md`](examples/minimal/README.md) for the Standard
+capture → review path and the intentional failure demo.
+
+### 2. Lite tier in your own project
 
 ```markdown
 | ID | Level | Claim | Gate (what proves it) | Status | Evidence |
@@ -88,7 +115,19 @@ python3 skill/wincreator/scripts/wincreator.py prove P2 \
   -- python3 check_parser.py
 ```
 
-For Standard / Regulated work, capture and review are separate steps (see below).
+### 3. Real session transcript
+
+A non-fictional Micro loop where the Skeptic caught a missing `ValueError`
+path after five green tests:
+
+→ [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md)
+
+## Tiers
+
+![Lite · Standard · Regulated](docs/assets/tiers.svg)
+
+Ceremony must stay proportional to stakes. If you cannot name why the task
+needs Standard, it is a Lite task.
 
 ## What changed in v3
 
@@ -238,6 +277,16 @@ CI runs these gates on Ubuntu, Windows, and macOS with Python 3.10, 3.11,
 OpenAI Skill Creator validator plus the pinned Agent Skills reference
 validator in a separate job.
 
+## Learn more
+
+| Resource | Purpose |
+|----------|---------|
+| [`examples/minimal/`](examples/minimal/) | Copy-paste sandbox |
+| [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | Real session + Skeptic catch |
+| [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | Full protocol |
+| [`docs/assets/`](docs/assets/) | Diagrams (SVG) |
+| [Releases](https://github.com/winterbim/wincreator/releases) | Packages and notes |
+
 ## Publication status
 
 The authoritative publication state is GitHub, not this paragraph:
@@ -246,9 +295,9 @@ The authoritative publication state is GitHub, not this paragraph:
 - open PR checks: <https://github.com/winterbim/wincreator/pulls>;
 - latest release: <https://github.com/winterbim/wincreator/releases/latest>.
 
-Do not infer a v3 tag, release, assets, `latest` state, or successful public
-installation from the source tree alone. Those claims are evidenced only
-after the corresponding GitHub operations and clean-clone checks complete.
+Do not infer a successful public installation from the source tree alone.
+Those claims are evidenced only after the corresponding GitHub operations and
+clean-clone checks complete.
 
 ## License
 
