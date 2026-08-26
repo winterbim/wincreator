@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 
@@ -66,12 +67,9 @@ def test_verify_still_rejects_tampered_historical_capture(wincreator, tmp_path):
     wincreator.review_attestation(latest, "EVIDENCED", "skeptic", str(ledger))
 
     historical = Path(first)
-    historical.write_text(
-        historical.read_text(encoding="utf-8").replace(
-            '"tool_version": "3.0.1"', '"tool_version": "9.9.9"', 1
-        ),
-        encoding="utf-8",
-    )
+    document = json.loads(historical.read_text(encoding="utf-8"))
+    document["payload"]["tool_version"] = "tampered-version"
+    historical.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
     checked, problems = wincreator.verify_ledger_references(str(ledger))
     assert checked == 2
