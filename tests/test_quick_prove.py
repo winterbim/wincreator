@@ -56,3 +56,26 @@ def test_quick_standard_stops_at_pending(tmp_path):
     assert code == 0
     assert "PENDING" in ledger.read_text(encoding="utf-8")
     assert not list(attest.rglob("review.json"))
+
+
+def test_quick_initializes_precreated_empty_ledger(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    quick = load_quick(repo_root)
+    ledger = tmp_path / ".wincreator" / "PROOF_LEDGER.md"
+    ledger.parent.mkdir(parents=True)
+    ledger.touch()
+    attest = tmp_path / ".wincreator" / "attestations"
+
+    code = quick.main([
+        "empty ledger is initialized",
+        "--ledger", str(ledger),
+        "--attest-dir", str(attest),
+        "--",
+        sys.executable, "-c", "print('ok')",
+    ])
+
+    assert code == 0
+    text = ledger.read_text(encoding="utf-8")
+    assert "| ID | Level | Claim | Gate (what proves it) | Status | Evidence |" in text
+    assert "empty ledger is initialized" in text
+    assert "EVIDENCED" in text
