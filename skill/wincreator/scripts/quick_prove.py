@@ -83,15 +83,17 @@ def build_parser():
     parser.add_argument("--max-output-bytes", type=int, default=wincreator.DEFAULT_MAX_OUTPUT_BYTES)
     parser.add_argument("--no-output-body", action="store_true")
     parser.add_argument("--private", action="store_true")
-    parser.add_argument("gate", nargs=argparse.REMAINDER)
     return parser
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
-    command = list(args.gate)
-    if command and command[0] == "--":
-        command = command[1:]
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--" not in argv:
+        print("ERROR: separate the claim options from the real gate with `--`", file=sys.stderr)
+        return 2
+    separator = argv.index("--")
+    option_argv, command = argv[:separator], argv[separator + 1 :]
+    args = build_parser().parse_args(option_argv)
     if not command:
         print("ERROR: supply the real gate after `--`", file=sys.stderr)
         return 2
