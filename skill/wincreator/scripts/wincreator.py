@@ -966,6 +966,8 @@ def verify_ledger_references(ledger_path):
         if real not in seen:
             seen.add(real)
             unique.append(path)
+
+    verified = []
     for capture_path in unique:
         checked += 1
         ok, capture_problems = verify_attestation(capture_path)
@@ -985,6 +987,7 @@ def verify_ledger_references(ledger_path):
                 problems.append(f"{ledger_path}: row {claim['id']} {key} changed after capture")
         if current["row_sha256"] != claim["row_sha256"]:
             problems.append(f"{ledger_path}: row {claim['id']} hash changed after capture")
+
         review_path = os.path.join(os.path.dirname(capture_path), "review.json")
         if os.path.isfile(review_path):
             review_ok, review_problems = verify_review(review_path, capture_path)
@@ -1018,17 +1021,47 @@ def verify_ledger_references(ledger_path):
                 capture["digest"]["value"],
                 os.path.dirname(os.path.abspath(ledger_path)),
             )
+        verified.append(
+            {
+                "claim_id": claim["id"],
+                "started_at": payload["started_at"],
+                "capture_path": capture_path,
+                "current": current,
+                "expected_status": expected_status,
+                "expected_evidence": expected_evidence,
+            }
+        )
+
+    # Historical proof chains remain integrity-checked above. The ledger's
+    # current evidence is authoritative about which valid chain is current.
+    # This avoids guessing from timestamps when proof executions overlap.
+    entries_by_claim = {}
+    for entry in verified:
+        entries_by_claim.setdefault(entry["claim_id"], []).append(entry)
+
+    for claim_id, entries in entries_by_claim.items():
+        current = entries[0]["current"]
+        matches = [
+            entry for entry in entries
+            if current["evidence"].startswith(entry["expected_evidence"])
+        ]
+        if len(matches) != 1:
+            problems.append(
+                f"{ledger_path}: row {claim_id} evidence does not uniquely identify "
+                "one valid capture/review chain"
+            )
+            continue
+        entry = matches[0]
+        expected_status = entry["expected_status"]
         if current["status"] != expected_status:
             problems.append(
-                f"{ledger_path}: row {claim['id']} status {current['status']} does not match "
-                f"capture/review status {expected_status}"
+                f"{ledger_path}: row {claim_id} status {current['status']} does not match "
+                f"current capture/review status {expected_status}"
             )
-        if not current["evidence"].startswith(expected_evidence):
-            problems.append(f"{ledger_path}: row {claim['id']} evidence was rewritten after capture/review")
         if expected_status != "EVIDENCED":
             problems.append(
-                f"{ledger_path}: row {claim['id']} is {expected_status}; "
-                "capture integrity is valid but the claim is not evidenced"
+                f"{ledger_path}: row {claim_id} is {expected_status}; "
+                "current proof integrity is valid but the claim is not evidenced"
             )
     return checked, problems
 

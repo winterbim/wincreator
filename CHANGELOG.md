@@ -9,6 +9,30 @@ frontmatter intentionally contains only `name` and `description`. A tag or
 release is authoritative only after it exists on GitHub. The v2 development
 history remains available in Git and is not restated here.
 
+## [3.0.2] — 2026-08-26
+
+Production-readiness close-out after an external-style end-to-end trial.
+
+### Added
+- `scripts/quick_prove.py`: zero-setup Lite/Standard entry point that creates a
+  minimal private ledger and a collision-safe claim ID from one explicit claim
+  plus one real gate command.
+- Regression coverage for empty pre-created ledgers and for longitudinal proof
+  histories containing `INSUFFICIENT`, `DISPROVEN`, and a later successful
+  re-proof.
+
+### Fixed
+- `verify --ledger` now integrity-checks every historical capture/review while
+  comparing the ledger's current status and evidence only with the newest proof
+  chain for each claim. Earlier failed or insufficient attempts remain valid
+  audit history instead of falsely contradicting a later `EVIDENCED` state.
+- A pre-existing empty `.wincreator/PROOF_LEDGER.md` is initialized with the
+  required table header instead of producing a malformed zero-setup ledger.
+
+### Changed
+- README and the short demo lead with the one-command proof path and make the
+  green-command/insufficient-evidence distinction the central demonstration.
+
 ## [3.0.1] — 2026-08-25
 
 Close-out after the 2026-08-25 audit: waiting is not a freeze, the live
@@ -78,10 +102,3 @@ First public release.
 - Worked example (`references/worked-example.md`): a real semver-comparator
   session where the Skeptic caught an unverified `ValueError` path.
 - Domain-adaptable proof checklist and a loop-ticket template.
-- CI workflow (`.github/workflows/ledger.yml`) that runs the ledger gate
-  on every push — the repository verifies its own `PROOF_LEDGER.md`.
-- `Skill_WinCreator.skill` release asset for manual installation.
-
-[3.0.1]: https://github.com/winterbim/wincreator/releases/tag/v3.0.1
-[3.0.0]: https://github.com/winterbim/wincreator/releases/tag/v3.0.0
-[1.0.0]: https://github.com/winterbim/wincreator/releases/tag/v1.0.0
