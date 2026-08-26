@@ -56,8 +56,11 @@ def ensure_claim(ledger_path, claim_id, claim_text, command):
         path = Path(ledger_path)
         if path.exists():
             existing = path.read_text(encoding="utf-8")
-            if existing and not existing.endswith("\n"):
-                existing += "\n"
+            if existing.strip():
+                if not existing.endswith("\n"):
+                    existing += "\n"
+            else:
+                existing = _ledger_header()
         else:
             existing = _ledger_header()
         mode = (os.stat(ledger_path).st_mode & 0o777) if os.path.exists(ledger_path) else 0o600
