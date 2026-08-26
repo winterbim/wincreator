@@ -1,0 +1,166 @@
+name: apply-history-fix
+
+on:
+  push:
+    branches:
+      - fix/longitudinal-proof-history
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/longitudinal-proof-history
+      - name: Patch longitudinal verification semantics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('skill/wincreator/scripts/wincreator.py')
+          source = path.read_text(encoding='utf-8')
+          start = source.index('def verify_ledger_references(ledger_path):')
+          end = source.index('\n\n# ---------------------------------------------------------------------- CLI', start)
+          replacement = '''def verify_ledger_references(ledger_path):
+              problems = []
+              checked = 0
+              try:
+                  ledger_text = Path(ledger_path).read_text(encoding="utf-8")
+              except OSError as error:
+                  return 0, [f"cannot read {ledger_path}: {error}"]
+              referenced = [match.group("path") for match in ATTESTATION_REF.finditer(ledger_text)]
+              capture_paths = []
+              for recorded in referenced:
+                  capture_paths.append(_resolve_recorded_path(recorded, ledger_path))
+              capture_paths.extend(_discover_ledger_attestations(ledger_path))
+              unique = []
+              seen = set()
+              for path in capture_paths:
+                  real = os.path.realpath(path)
+                  if real not in seen:
+                      seen.add(real)
+                      unique.append(path)
+
+              verified = []
+              for capture_path in unique:
+                  checked += 1
+                  ok, capture_problems = verify_attestation(capture_path)
+                  if not ok:
+                      problems.extend(f"{capture_path}: {problem}" for problem in capture_problems)
+                      continue
+                  capture = _load_json(capture_path)
+                  payload = capture["payload"]
+                  claim = payload["claim"]
+                  try:
+                      current = read_claim(ledger_path, claim["id"])
+                  except (KeyError, ValueError) as error:
+                      problems.append(f"{ledger_path}: captured claim {claim['id']} not uniquely present: {error}")
+                      continue
+                  for key, current_key in (("id", "id"), ("level", "level"), ("text", "text"), ("gate", "gate")):
+                      if claim[key] != current[current_key]:
+                          problems.append(f"{ledger_path}: row {claim['id']} {key} changed after capture")
+                  if current["row_sha256"] != claim["row_sha256"]:
+                      problems.append(f"{ledger_path}: row {claim['id']} hash changed after capture")
+
+                  review_path = os.path.join(os.path.dirname(capture_path), "review.json")
+                  if os.path.isfile(review_path):
+                      review_ok, review_problems = verify_review(review_path, capture_path)
+                      if not review_ok:
+                          problems.extend(f"{review_path}: {problem}" for problem in review_problems)
+                          continue
+                      review = _load_json(review_path)
+                      verdict = review["payload"]["verdict"]
+                      expected_status = {
+                          "EVIDENCED": "EVIDENCED",
+                          "INSUFFICIENT": "INSUFFICIENT",
+                          "DISPROVEN": "DISPROVEN",
+                      }[verdict]
+                      expected_evidence = review_evidence_sentence(
+                          payload,
+                          capture_path,
+                          capture["digest"]["value"],
+                          review,
+                          review_path,
+                          os.path.dirname(os.path.abspath(ledger_path)),
+                      )
+                  else:
+                      expected_status = {
+                          "CAPTURED_PASS": "PENDING",
+                          "CAPTURED_FAIL": "DISPROVEN",
+                          "CAPTURE_ERROR": "BLOCKED",
+                      }[payload["capture"]["status"]]
+                      expected_evidence = capture_evidence_sentence(
+                          payload,
+                          capture_path,
+                          capture["digest"]["value"],
+                          os.path.dirname(os.path.abspath(ledger_path)),
+                      )
+                  verified.append(
+                      {
+                          "claim_id": claim["id"],
+                          "started_at": payload["started_at"],
+                          "capture_path": capture_path,
+                          "current": current,
+                          "expected_status": expected_status,
+                          "expected_evidence": expected_evidence,
+                      }
+                  )
+
+              # Historical proof chains remain integrity-checked above. Only the
+              # newest chain for each claim defines the ledger's current state.
+              latest_by_claim = {}
+              for entry in verified:
+                  previous = latest_by_claim.get(entry["claim_id"])
+                  key = (entry["started_at"], os.path.realpath(entry["capture_path"]))
+                  if previous is None:
+                      latest_by_claim[entry["claim_id"]] = entry
+                      continue
+                  previous_key = (
+                      previous["started_at"],
+                      os.path.realpath(previous["capture_path"]),
+                  )
+                  if key > previous_key:
+                      latest_by_claim[entry["claim_id"]] = entry
+
+              for entry in latest_by_claim.values():
+                  current = entry["current"]
+                  expected_status = entry["expected_status"]
+                  expected_evidence = entry["expected_evidence"]
+                  claim_id = entry["claim_id"]
+                  if current["status"] != expected_status:
+                      problems.append(
+                          f"{ledger_path}: row {claim_id} status {current['status']} does not match "
+                          f"latest capture/review status {expected_status}"
+                      )
+                  if not current["evidence"].startswith(expected_evidence):
+                      problems.append(
+                          f"{ledger_path}: row {claim_id} evidence does not match the latest capture/review"
+                      )
+                  if expected_status != "EVIDENCED":
+                      problems.append(
+                          f"{ledger_path}: row {claim_id} is {expected_status}; "
+                          "latest capture integrity is valid but the claim is not evidenced"
+                      )
+              return checked, problems
+          '''
+          # The triple-quoted replacement above is indented by this workflow's
+          # Python block. Normalize it before writing it into the module.
+          import textwrap
+          replacement = textwrap.dedent(replacement)
+          path.write_text(source[:start] + replacement + source[end:], encoding='utf-8')
+          PY
+          python -m py_compile skill/wincreator/scripts/wincreator.py
+          python -m pytest -q tests/test_longitudinal_history.py
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add skill/wincreator/scripts/wincreator.py
+          git commit -m "fix: verify latest proof state while preserving history"
+          git push origin HEAD:fix/longitudinal-proof-history
