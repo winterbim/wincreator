@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sys
 
@@ -97,4 +98,34 @@ def test_verify_uses_latest_unreviewed_state_not_older_evidence(wincreator, tmp_
 
     checked, problems = wincreator.verify_ledger_references(str(ledger))
     assert checked == 2
-    assert any("latest capture integrity is valid but the claim is not evidenced" in p for p in problems)
+    assert any("current proof integrity is valid but the claim is not evidenced" in p for p in problems)
+
+
+def test_verify_tracks_ledger_evidence_when_overlapping_captures_finish_out_of_start_order(wincreator, tmp_path):
+    ledger = tmp_path / "PROOF_LEDGER.md"
+    attest_dir = tmp_path / ".wincreator" / "attestations"
+    _ledger(ledger)
+
+    slow = [sys.executable, "-c", "import time; time.sleep(0.35); print('slow')"]
+    fast = [sys.executable, "-c", "import time; time.sleep(0.05); print('fast')"]
+
+    def capture(command):
+        return wincreator.run_and_attest(
+            "P1", command, ledger=str(ledger), attest_dir=str(attest_dir),
+            cwd=str(tmp_path), quiet=True, tier="lite", auto_approve_lite=True,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        slow_future = pool.submit(capture, slow)
+        # Ensure the slow gate has a head start but finishes after the fast gate.
+        import time
+        time.sleep(0.05)
+        fast_future = pool.submit(capture, fast)
+        slow_future.result()
+        fast_future.result()
+
+    current = wincreator.read_claim(str(ledger), "P1")
+    assert current["status"] == "EVIDENCED"
+    checked, problems = wincreator.verify_ledger_references(str(ledger))
+    assert checked == 2
+    assert problems == []
