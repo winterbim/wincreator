@@ -1032,40 +1032,36 @@ def verify_ledger_references(ledger_path):
             }
         )
 
-    # Historical proof chains remain integrity-checked above. Only the
-    # newest chain for each claim defines the ledger's current state.
-    latest_by_claim = {}
+    # Historical proof chains remain integrity-checked above. The ledger's
+    # current evidence is authoritative about which valid chain is current.
+    # This avoids guessing from timestamps when proof executions overlap.
+    entries_by_claim = {}
     for entry in verified:
-        previous = latest_by_claim.get(entry["claim_id"])
-        key = (entry["started_at"], os.path.realpath(entry["capture_path"]))
-        if previous is None:
-            latest_by_claim[entry["claim_id"]] = entry
-            continue
-        previous_key = (
-            previous["started_at"],
-            os.path.realpath(previous["capture_path"]),
-        )
-        if key > previous_key:
-            latest_by_claim[entry["claim_id"]] = entry
+        entries_by_claim.setdefault(entry["claim_id"], []).append(entry)
 
-    for entry in latest_by_claim.values():
-        current = entry["current"]
+    for claim_id, entries in entries_by_claim.items():
+        current = entries[0]["current"]
+        matches = [
+            entry for entry in entries
+            if current["evidence"].startswith(entry["expected_evidence"])
+        ]
+        if len(matches) != 1:
+            problems.append(
+                f"{ledger_path}: row {claim_id} evidence does not uniquely identify "
+                "one valid capture/review chain"
+            )
+            continue
+        entry = matches[0]
         expected_status = entry["expected_status"]
-        expected_evidence = entry["expected_evidence"]
-        claim_id = entry["claim_id"]
         if current["status"] != expected_status:
             problems.append(
                 f"{ledger_path}: row {claim_id} status {current['status']} does not match "
-                f"latest capture/review status {expected_status}"
-            )
-        if not current["evidence"].startswith(expected_evidence):
-            problems.append(
-                f"{ledger_path}: row {claim_id} evidence does not match the latest capture/review"
+                f"current capture/review status {expected_status}"
             )
         if expected_status != "EVIDENCED":
             problems.append(
                 f"{ledger_path}: row {claim_id} is {expected_status}; "
-                "latest capture integrity is valid but the claim is not evidenced"
+                "current proof integrity is valid but the claim is not evidenced"
             )
     return checked, problems
 
