@@ -966,6 +966,8 @@ def verify_ledger_references(ledger_path):
         if real not in seen:
             seen.add(real)
             unique.append(path)
+
+    verified = []
     for capture_path in unique:
         checked += 1
         ok, capture_problems = verify_attestation(capture_path)
@@ -985,6 +987,7 @@ def verify_ledger_references(ledger_path):
                 problems.append(f"{ledger_path}: row {claim['id']} {key} changed after capture")
         if current["row_sha256"] != claim["row_sha256"]:
             problems.append(f"{ledger_path}: row {claim['id']} hash changed after capture")
+
         review_path = os.path.join(os.path.dirname(capture_path), "review.json")
         if os.path.isfile(review_path):
             review_ok, review_problems = verify_review(review_path, capture_path)
@@ -1018,17 +1021,51 @@ def verify_ledger_references(ledger_path):
                 capture["digest"]["value"],
                 os.path.dirname(os.path.abspath(ledger_path)),
             )
+        verified.append(
+            {
+                "claim_id": claim["id"],
+                "started_at": payload["started_at"],
+                "capture_path": capture_path,
+                "current": current,
+                "expected_status": expected_status,
+                "expected_evidence": expected_evidence,
+            }
+        )
+
+    # Historical proof chains remain integrity-checked above. Only the
+    # newest chain for each claim defines the ledger's current state.
+    latest_by_claim = {}
+    for entry in verified:
+        previous = latest_by_claim.get(entry["claim_id"])
+        key = (entry["started_at"], os.path.realpath(entry["capture_path"]))
+        if previous is None:
+            latest_by_claim[entry["claim_id"]] = entry
+            continue
+        previous_key = (
+            previous["started_at"],
+            os.path.realpath(previous["capture_path"]),
+        )
+        if key > previous_key:
+            latest_by_claim[entry["claim_id"]] = entry
+
+    for entry in latest_by_claim.values():
+        current = entry["current"]
+        expected_status = entry["expected_status"]
+        expected_evidence = entry["expected_evidence"]
+        claim_id = entry["claim_id"]
         if current["status"] != expected_status:
             problems.append(
-                f"{ledger_path}: row {claim['id']} status {current['status']} does not match "
-                f"capture/review status {expected_status}"
+                f"{ledger_path}: row {claim_id} status {current['status']} does not match "
+                f"latest capture/review status {expected_status}"
             )
         if not current["evidence"].startswith(expected_evidence):
-            problems.append(f"{ledger_path}: row {claim['id']} evidence was rewritten after capture/review")
+            problems.append(
+                f"{ledger_path}: row {claim_id} evidence does not match the latest capture/review"
+            )
         if expected_status != "EVIDENCED":
             problems.append(
-                f"{ledger_path}: row {claim['id']} is {expected_status}; "
-                "capture integrity is valid but the claim is not evidenced"
+                f"{ledger_path}: row {claim_id} is {expected_status}; "
+                "latest capture integrity is valid but the claim is not evidenced"
             )
     return checked, problems
 
