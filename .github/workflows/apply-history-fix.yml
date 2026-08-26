@@ -1,0 +1,30 @@
+name: apply-history-fix
+
+on:
+  push:
+    branches:
+      - fix/longitudinal-proof-history
+
+permissions:
+  contents: write
+
+jobs:
+  tag-release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: d82ef9c10d9d770e45a721872801ed5918113e16
+          fetch-depth: 0
+      - name: Create v3.0.2 tag on verified master commit
+        shell: bash
+        run: |
+          test "$(cat skill/wincreator/VERSION)" = "3.0.2"
+          git merge-base --is-ancestor HEAD origin/master
+          if git ls-remote --exit-code --tags origin refs/tags/v3.0.2 >/dev/null 2>&1; then
+            echo "v3.0.2 already exists" >&2
+            exit 2
+          fi
+          git tag v3.0.2 d82ef9c10d9d770e45a721872801ed5918113e16
+          git push origin refs/tags/v3.0.2
