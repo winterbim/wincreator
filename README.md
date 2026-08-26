@@ -1,37 +1,169 @@
 # WinCreator
 
-**Stop your AI agent from lying about tests.**
+**Stop your AI agent from turning “the command passed” into “the claim is true.”**
 
-WinCreator structures consequential engineering work as proof-gated loops.
-It keeps claims in a Markdown ledger, captures the command that tested each
-claim, and separates a mechanical command result from an independent review.
+WinCreator gives agent work a small proof protocol: write the claim, run the real gate, capture what happened, and only then decide whether the evidence actually proves the claim.
 
 [![ci — default branch](https://github.com/winterbim/wincreator/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/winterbim/wincreator/actions/workflows/ci.yml?query=branch%3Amaster)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/winterbim/wincreator)](https://github.com/winterbim/wincreator/releases/latest)
 
-The CI badge reports the default branch only. It is not evidence that an open
-pull request is green; use that PR's checks for the PR state.
-
 ![Assertion vs proof](docs/assets/before-after.svg)
 
-## Install in one command
+## The 10-second path
+
+Install the skill:
 
 ```bash
 npx skills add winterbim/wincreator
 ```
 
-That installs the skill for agents that support the `skills` CLI.
-Then confirm the active version matches `skill/wincreator/VERSION`:
+Then prove one explicit claim with one real command:
 
 ```bash
-cat ~/.claude/skills/wincreator/VERSION   # Claude Code path
-# or the equivalent path used by your agent
+export WC=~/.claude/skills/wincreator
+python3 "$WC/scripts/quick_prove.py" \
+  "parser rejects malformed input" \
+  -- python3 check_parser.py
 ```
 
-### Other install paths
+That single command:
 
-**Claude Code (manual copy)**
+1. creates a minimal `.wincreator/PROOF_LEDGER.md` if needed;
+2. creates a unique claim ID;
+3. binds the exact plain-language claim to the exact command;
+4. captures stdout, stderr, exit status, timing, environment and Git context;
+5. writes a tamper-evident attestation;
+6. marks a successful **Lite** proof `EVIDENCED` automatically.
+
+No hand-written ledger is required for the default path.
+
+A passing command is still not magical proof. The claim remains explicit so a higher-stakes run can be reviewed independently instead of collapsing into “exit 0 = truth.”
+
+## Why this is different from running tests
+
+An agent can run a green test suite and still make a false statement because the test may not cover the claim it is being used to justify.
+
+WinCreator separates two questions:
+
+```text
+Did the command succeed?        -> CAPTURED_PASS / FAIL / ERROR
+Does that evidence prove this?  -> EVIDENCED / INSUFFICIENT / DISPROVEN
+```
+
+That separation is the core of the project.
+
+![Prove → review → gate](docs/assets/flow-prove-review.svg)
+
+## Standard: same entry point, independent review
+
+For consequential work, keep the same one-line creation path but require a separate review:
+
+```bash
+python3 "$WC/scripts/quick_prove.py" \
+  "migration preserves every legacy permission" \
+  --tier standard \
+  -- python3 tests/test_migration.py
+```
+
+A green command becomes `PENDING`, not `EVIDENCED`.
+
+The capture prints the generated claim ID. A separate reviewer then evaluates whether the captured gate really proves the claim:
+
+```bash
+python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
+  --ledger .wincreator/PROOF_LEDGER.md \
+  --verdict evidenced \
+  --reviewer skeptic-01
+```
+
+The reviewer may instead record `INSUFFICIENT` or `DISPROVEN`.
+
+This is the failure mode WinCreator is built to catch:
+
+```text
+tests green
+    ↓
+agent wants to say DONE
+    ↓
+review notices the test never exercised one part of the claim
+    ↓
+INSUFFICIENT
+```
+
+## Three tiers
+
+![Lite · Standard · Regulated](docs/assets/tiers.svg)
+
+| Tier | Use it when | Behavior |
+|---|---|---|
+| **Lite** | one claim, one gate, directly inspectable | zero-setup proof, automatic mechanical approval |
+| **Standard** | multi-step or expensive-to-miss failure | captured gate + separate review |
+| **Regulated** | audited / contractual / safety / compliance-relevant work | Standard + clean Git state, distinct builder/reviewer IDs, retained attestations and surrounding human sign-off policy |
+
+If you cannot name why the task needs Standard, use Lite.
+
+`Regulated` is a workflow tier, **not a compliance certification**. HMAC is tamper evidence for a key holder, not a public signature or transparency log.
+
+## Full protocol
+
+The installable skill adds three defenses to longer agent sessions:
+
+- **Optimism leak** → Proof Ledger + Builder/Skeptic separation
+- **Context rot** → Loop Panel
+- **Stuck loops** → Two-Failure Rule
+
+Read [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) for the complete protocol.
+
+For a real session where a Skeptic caught a missing error path after green tests, see [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md).
+
+## Manual capture API
+
+If you already maintain a ledger row, use the lower-level CLI directly:
+
+```bash
+python3 "$WC/scripts/wincreator.py" prove P2 \
+  --tier standard \
+  --builder builder-01 \
+  --ledger PROOF_LEDGER.md \
+  -- python3 check_parser.py
+```
+
+Review:
+
+```bash
+python3 "$WC/scripts/wincreator.py" review P2 \
+  --ledger PROOF_LEDGER.md \
+  --verdict evidenced \
+  --reviewer skeptic-01
+```
+
+Verify capture logs, review linkage and ledger bindings:
+
+```bash
+python3 "$WC/scripts/wincreator.py" verify --ledger PROOF_LEDGER.md
+```
+
+## Sensitive data
+
+Captured output and metadata can contain secrets. Use the built-in controls before execution:
+
+```bash
+python3 "$WC/scripts/quick_prove.py" \
+  "private integration check succeeds" \
+  --redact "$TOKEN" \
+  --redact-regex 'password=[^ ]+' \
+  --max-output-bytes 1048576 \
+  --no-output-body \
+  --private \
+  -- python3 check_integration.py
+```
+
+Redaction occurs before retained output is hashed. The gate process never inherits `WINCREATOR_SIGNING_KEY`; signing happens only after the gate exits.
+
+## Other installation paths
+
+**Claude Code — manual copy**
 
 ```bash
 git clone https://github.com/winterbim/wincreator.git
@@ -43,235 +175,13 @@ python3 ~/.claude/skills/wincreator/scripts/wincreator.py --self-test
 
 **ChatGPT / manual package**
 
-Build or download `skill.zip`, then upload that file. It contains a single
-root directory, `wincreator/`, and a single `SKILL.md`.
+Build or download `skill.zip`, then upload it:
 
 ```bash
 ./tools/build_package.sh
-# then upload dist/.../skill.zip
 ```
 
-Release assets: [latest](https://github.com/winterbim/wincreator/releases/latest).
-
-**Migrating from v1/v2**
-
-```bash
-python3 tools/migrate_v2_to_v3.py
-```
-
-The migration tool backs up known old installations, removes only those known
-directories, installs v3, runs the validators, and prints the active version.
-
-## Why this exists
-
-Every agent-assisted engineering session degrades the same three ways:
-
-1. **Optimism leak** — the same context that wrote the code grades its own work.
-2. **Context rot** — early constraints get lost as the session grows.
-3. **Stuck loops** — a failing check is attacked at the wrong level again and again.
-
-WinCreator counters each one mechanically: Proof Ledger + Builder/Skeptic
-separation, the Loop Panel, and the Two-Failure Rule. It is domain-agnostic
-(no language or framework assumed) and works with any agent that can follow a
-skill protocol.
-
-![Prove → review → gate](docs/assets/flow-prove-review.svg)
-
-## Quick start
-
-### 1. Minimal sandbox (copy-paste)
-
-A ready-to-run toy claim lives in [`examples/minimal/`](examples/minimal/).
-Requires a clone of this repository (or an installed skill path).
-
-```bash
-cd examples/minimal
-# From a clone of this repo:
-export WC=../../skill/wincreator
-# After install only (no clone of scripts into your project):
-# export WC=~/.claude/skills/wincreator
-
-python3 "$WC/scripts/wincreator.py" prove M1 \
-  --tier lite --auto-approve-lite \
-  --builder demo-builder \
-  --ledger PROOF_LEDGER.md \
-  -- python3 check_example.py
-
-python3 "$WC/scripts/ledger_check.py" PROOF_LEDGER.md
-```
-
-See [`examples/minimal/README.md`](examples/minimal/README.md) for the Standard
-capture → review path and the intentional failure demo.
-
-### 2. Lite tier in your own project
-
-Use a **new ledger file** in your project (do not reuse the repo's
-`PROOF_LEDGER.md`, which already contains other claim IDs).
-
-```markdown
-# my-PROOF_LEDGER.md
-| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
-|----|-------|-------|------------------------|--------|----------|
-| Q1 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
-```
-
-```bash
-# Prefer the installed skill path after `npx skills add` / manual copy:
-export WC=~/.claude/skills/wincreator
-# Or, from a clone of this repository only:
-# export WC=./skill/wincreator
-
-python3 "$WC/scripts/wincreator.py" prove Q1 \
-  --tier lite --auto-approve-lite \
-  --builder builder-01 \
-  --ledger my-PROOF_LEDGER.md \
-  -- python3 check_parser.py
-```
-
-### 3. Real session transcript
-
-A non-fictional Micro loop where the Skeptic caught a missing `ValueError`
-path after five green tests:
-
-→ [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md)
-
-## Tiers
-
-![Lite · Standard · Regulated](docs/assets/tiers.svg)
-
-Ceremony must stay proportional to stakes. If you cannot name why the task
-needs Standard, it is a Lite task.
-
-## What changed in v3
-
-Earlier versions could validate a sentence about a proof. v3 captures the
-process that ran the gate and binds it to the exact claim:
-
-- exactly one installable Skill: `skill/wincreator/SKILL.md`;
-- official frontmatter containing only `name` and `description`;
-- current `agents/openai.yaml` interface metadata;
-- `CAPTURED_PASS`, `CAPTURED_FAIL`, and `CAPTURE_ERROR` separated from
-  `EVIDENCED`, `INSUFFICIENT`, and `DISPROVEN` review verdicts;
-- claim ID, level, text, gate, row digest, and pre-capture ledger digest in
-  every attestation;
-- atomic, locked ledger writes and duplicate-ID rejection;
-- mandatory `--file`, explicit `--optional-file`, collision-safe run IDs;
-- clean-tree enforcement for Regulated captures;
-- output redaction, size limits, body suppression, and private captures;
-- deterministic `skill.zip` and byte-identical `wincreator.skill` packages;
-- Linux, Windows, and macOS CI across Python 3.10–3.13.
-
-The version is stored in `skill/wincreator/VERSION`, not in SKILL.md
-frontmatter.
-
-## Capture and review
-
-Given a ledger row:
-
-```markdown
-| ID | Level | Claim | Gate (what proves it) | Status | Evidence |
-|----|-------|-------|------------------------|--------|----------|
-| P2 | Micro | parser rejects malformed input | `python3 check_parser.py` | CLAIMED | |
-```
-
-Capture the gate:
-
-```bash
-python3 skill/wincreator/scripts/wincreator.py prove P2 \
-  --tier standard \
-  --builder builder-01 \
-  -- python3 check_parser.py
-```
-
-An exit code of zero produces `CAPTURED_PASS` but leaves the ledger row
-`PENDING` until review. A non-zero exit produces `CAPTURED_FAIL` and records
-`DISPROVEN`; the CLI returns the gate's non-zero code.
-
-Review the capture:
-
-```bash
-python3 skill/wincreator/scripts/wincreator.py review P2 \
-  --verdict evidenced \
-  --reviewer skeptic-01
-```
-
-Verify capture logs, attested files, review linkage, ledger status, and the
-unchanged claim/gate fields:
-
-```bash
-python3 skill/wincreator/scripts/wincreator.py verify \
-  --ledger PROOF_LEDGER.md
-```
-
-Lite work may opt into `--tier lite --auto-approve-lite`. Standard and
-Regulated work require a separate review. In Regulated mode the Git state must
-remain unchanged through the gate and the reviewer identifier must differ from
-the Builder. The CLI records `--automatic` reviews explicitly; authenticated
-human independence and approval must be enforced by the surrounding PR or
-compliance process. Standard captures outside Git should pass source inputs
-with `--file`; otherwise the CLI warns that no source snapshot is claim-bound.
-
-## Sensitive data
-
-stdout, stderr, file paths, the working directory, hostname, username, and
-attested files may contain sensitive data. Apply controls before capture:
-
-```bash
-python3 skill/wincreator/scripts/wincreator.py prove P2 \
-  --redact "$TOKEN" \
-  --redact-regex 'password=[^ ]+' \
-  --max-output-bytes 1048576 \
-  --no-output-body \
-  --private \
-  -- python3 check_parser.py
-```
-
-Redaction happens before logs are written and hashes cover the retained,
-redacted bytes. Attestations record original and retained byte counts. The
-gate never inherits `WINCREATOR_SIGNING_KEY`; HMAC signing happens after it
-exits.
-
-HMAC makes modifications detectable to someone holding the key. It is not a
-public signature or an independent transparency log, and a repository owner
-who also holds the key can rewrite history. Sigstore, Rekor, in-toto and full
-SLSA remain future work.
-
-## Package validation
-
-The internal policy checker deliberately makes only this claim:
-
-```bash
-python3 skill/wincreator/scripts/package_check.py skill/wincreator
-# WINCREATOR PACKAGE POLICY: PASS
-```
-
-Official validation is separate:
-
-```bash
-python3 /path/to/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py \
-  skill/wincreator
-npx --yes skills-ref@0.1.5 validate skill/wincreator
-```
-
-Build twice and compare the deterministic package:
-
-```bash
-./tools/build_package.sh dist/build-1
-./tools/build_package.sh dist/build-2
-sha256sum dist/build-1/skill.zip dist/build-2/skill.zip
-```
-
-Each output directory contains:
-
-```text
-skill.zip
-skill.zip.sha256
-wincreator.skill
-wincreator.skill.sha256
-```
-
-`skill.zip` and `wincreator.skill` are byte-identical aliases. Their only
-Skill entry is `wincreator/SKILL.md`, and the archive must remain below 25 MiB.
+Release assets: [latest release](https://github.com/winterbim/wincreator/releases/latest).
 
 ## Development gates
 
@@ -286,32 +196,18 @@ python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEP
 ./tools/build_package.sh
 ```
 
-CI runs these gates on Ubuntu, Windows, and macOS with Python 3.10, 3.11,
-3.12, and 3.13, uploads a package from every matrix job, and runs the pinned
-OpenAI Skill Creator validator plus the pinned Agent Skills reference
-validator in a separate job.
+CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the packaged skill with the pinned OpenAI Skill Creator and Agent Skills reference validators.
 
-## Learn more
+## Project map
 
 | Resource | Purpose |
-|----------|---------|
-| [`examples/minimal/`](examples/minimal/) | Copy-paste sandbox |
-| [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | Real session + Skeptic catch |
-| [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | Full protocol |
-| [`docs/assets/`](docs/assets/) | Diagrams (SVG) |
-| [Releases](https://github.com/winterbim/wincreator/releases) | Packages and notes |
-
-## Publication status
-
-The authoritative publication state is GitHub, not this paragraph:
-
-- default branch: <https://github.com/winterbim/wincreator>;
-- open PR checks: <https://github.com/winterbim/wincreator/pulls>;
-- latest release: <https://github.com/winterbim/wincreator/releases/latest>.
-
-Do not infer a successful public installation from the source tree alone.
-Those claims are evidenced only after the corresponding GitHub operations and
-clean-clone checks complete.
+|---|---|
+| [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |
+| [`examples/minimal/`](examples/minimal/) | runnable sandbox |
+| [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | real Skeptic catch |
+| [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | full protocol |
+| [`docs/DEMO.md`](docs/DEMO.md) | short demonstration flow |
+| [Releases](https://github.com/winterbim/wincreator/releases) | packaged artifacts |
 
 ## License
 

@@ -1,81 +1,94 @@
 # Public demo script (~60 seconds)
 
-Use this narrative for a screen recording, LinkedIn video, or live talk.
-Keep it factual. Do not invent outputs.
+The demo should make one idea obvious: **green is not the same thing as proven**.
+Use real output only.
 
-## Setup before recording
+## Setup
 
 ```bash
 cd examples/minimal
 export WC=../../skill/wincreator   # or ~/.claude/skills/wincreator
-# Reset ledger row to CLAIMED if replaying
+rm -rf .wincreator
 ```
-
-Have two terminal panes or a clear scrollback.
 
 ## Script
 
-**0:00–0:10 — The problem**
+**0:00–0:08 — The familiar failure**
 
-> “Your agent just said: tests pass, we’re done.
-> That is an assertion. In serious work — BIM data, production code,
-> compliance — an assertion is not a deliverable.”
+Show this sentence full-screen:
 
-Show a chat bubble or text: `Tests pass. Done.`
+> “Tests passed. The feature is done.”
 
-**0:10–0:25 — Claim + prove**
+Say:
 
-> “WinCreator forces the claim into a ledger, then runs the gate for real.”
+> “Agents collapse two different questions: did a command pass, and did that command actually prove the claim?”
 
-Show `PROOF_LEDGER.md` with `CLAIMED`, then run:
+**0:08–0:22 — One command, no setup**
+
+Run:
 
 ```bash
-python3 "$WC/scripts/wincreator.py" prove M1 \
-  --tier standard --builder demo-builder \
-  --ledger PROOF_LEDGER.md \
+python3 "$WC/scripts/quick_prove.py" \
+  "the example output satisfies its contract" \
   -- python3 check_example.py
 ```
 
-Point at `CAPTURED_PASS` and the fact the row is still not `EVIDENCED`
-without review (Standard).
+Point at the explicit claim, gate, capture status, attestation and generated ledger path.
 
-**0:25–0:40 — Independent review**
+Say:
 
-```bash
-python3 "$WC/scripts/wincreator.py" review M1 \
-  --verdict evidenced --reviewer demo-skeptic \
-  --ledger PROOF_LEDGER.md
-```
+> “Lite is deliberately cheap. I state the claim, WinCreator creates the evidence trail, and the gate actually runs.”
 
-> “Capture is not proof. A separate review decides whether the capture
-> actually supports the claim.”
+**0:22–0:38 — Raise the stakes**
 
-**0:40–0:55 — Mechanical gate + failure path (optional cut)**
+Run the same shape in Standard:
 
 ```bash
-python3 "$WC/scripts/ledger_check.py" PROOF_LEDGER.md
+python3 "$WC/scripts/quick_prove.py" \
+  "the example output satisfies its contract" \
+  --tier standard \
+  -- python3 check_example.py
 ```
 
-Optional second take: `--fail` on `check_example.py` to show `DISPROVEN`.
+Point at `CAPTURED_PASS` and `PENDING`.
 
-**0:55–1:00 — Close**
+Say:
 
-> “Evidence over assertion. Same standard we already demand of BIM data.”
+> “Same green command. Different conclusion. Standard refuses to call the claim evidenced until the capture itself is reviewed.”
 
-Show install line:
+**0:38–0:52 — Show the actual product**
+
+Use the generated claim ID from the previous command:
+
+```bash
+python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
+  --ledger .wincreator/PROOF_LEDGER.md \
+  --verdict insufficient \
+  --reviewer demo-skeptic
+```
+
+Say:
+
+> “If the test is too weak for the claim, the honest result is `INSUFFICIENT` — even though the test passed.”
+
+This is the important moment of the demo. Do not make the happy path the climax.
+
+**0:52–1:00 — Close**
+
+Show:
 
 ```bash
 npx skills add winterbim/wincreator
 ```
 
-## Assets to put on screen
+Say:
 
-- `docs/assets/before-after.svg`
-- `docs/assets/flow-prove-review.svg`
-- Terminal with real command output only
+> “WinCreator does not make tests smarter. It stops agents from saying that a test proved more than it actually proved.”
 
-## What not to do
+## Rules for the recording
 
-- Do not skip the ledger file on screen
-- Do not pretend Lite auto-approve is Regulated compliance
-- Do not claim stars, downloads, or adoption numbers you have not measured
+- Keep the terminal output real.
+- Do not hand-edit the quick ledger before the demo.
+- Make `INSUFFICIENT` visible; that is the differentiator.
+- Do not describe Lite auto-approval as independent review.
+- Do not claim adoption, compliance or security guarantees beyond what the repository demonstrates.
