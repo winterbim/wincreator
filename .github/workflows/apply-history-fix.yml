@@ -25,40 +25,40 @@ jobs:
           source = path.read_text(encoding='utf-8')
           start = source.index('    # Historical proof chains remain integrity-checked above. Only the\n')
           end = source.index('    return checked, problems\n\n\n# ---------------------------------------------------------------------- CLI', start)
-          replacement = '''    # Historical proof chains remain integrity-checked above. The ledger's
-              # current evidence is authoritative about which valid chain is current.
-              # This avoids guessing from timestamps when proof executions overlap.
-              entries_by_claim = {}
-              for entry in verified:
-                  entries_by_claim.setdefault(entry["claim_id"], []).append(entry)
-
-              for claim_id, entries in entries_by_claim.items():
-                  current = entries[0]["current"]
-                  matches = [
-                      entry for entry in entries
-                      if current["evidence"].startswith(entry["expected_evidence"])
-                  ]
-                  if len(matches) != 1:
-                      problems.append(
-                          f"{ledger_path}: row {claim_id} evidence does not uniquely identify "
-                          "one valid capture/review chain"
-                      )
-                      continue
-                  entry = matches[0]
-                  expected_status = entry["expected_status"]
-                  if current["status"] != expected_status:
-                      problems.append(
-                          f"{ledger_path}: row {claim_id} status {current['status']} does not match "
-                          f"current capture/review status {expected_status}"
-                      )
-                  if expected_status != "EVIDENCED":
-                      problems.append(
-                          f"{ledger_path}: row {claim_id} is {expected_status}; "
-                          "current proof integrity is valid but the claim is not evidenced"
-                      )
-          '''
-          import textwrap
-          replacement = textwrap.dedent(replacement)
+          lines = [
+              "    # Historical proof chains remain integrity-checked above. The ledger's",
+              "    # current evidence is authoritative about which valid chain is current.",
+              "    # This avoids guessing from timestamps when proof executions overlap.",
+              "    entries_by_claim = {}",
+              "    for entry in verified:",
+              "        entries_by_claim.setdefault(entry[\"claim_id\"], []).append(entry)",
+              "",
+              "    for claim_id, entries in entries_by_claim.items():",
+              "        current = entries[0][\"current\"]",
+              "        matches = [",
+              "            entry for entry in entries",
+              "            if current[\"evidence\"].startswith(entry[\"expected_evidence\"])",
+              "        ]",
+              "        if len(matches) != 1:",
+              "            problems.append(",
+              "                f\"{ledger_path}: row {claim_id} evidence does not uniquely identify \"",
+              "                \"one valid capture/review chain\"",
+              "            )",
+              "            continue",
+              "        entry = matches[0]",
+              "        expected_status = entry[\"expected_status\"]",
+              "        if current[\"status\"] != expected_status:",
+              "            problems.append(",
+              "                f\"{ledger_path}: row {claim_id} status {current['status']} does not match \"",
+              "                f\"current capture/review status {expected_status}\"",
+              "            )",
+              "        if expected_status != \"EVIDENCED\":",
+              "            problems.append(",
+              "                f\"{ledger_path}: row {claim_id} is {expected_status}; \"",
+              "                \"current proof integrity is valid but the claim is not evidenced\"",
+              "            )",
+          ]
+          replacement = '\n'.join(lines) + '\n'
           path.write_text(source[:start] + replacement + source[end:], encoding='utf-8')
           PY
           python -m py_compile skill/wincreator/scripts/wincreator.py
