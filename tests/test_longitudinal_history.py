@@ -121,11 +121,48 @@ def test_verify_tracks_ledger_evidence_when_overlapping_captures_finish_out_of_s
         import time
         time.sleep(0.05)
         fast_future = pool.submit(capture, fast)
-        slow_future.result()
         fast_future.result()
+        try:
+            slow_future.result()
+        except RuntimeError as error:
+            assert "stale result not applied" in str(error)
+        else:
+            raise AssertionError("older overlapping capture was allowed to overwrite newer proof state")
 
     current = wincreator.read_claim(str(ledger), "P1")
     assert current["status"] == "EVIDENCED"
     checked, problems = wincreator.verify_ledger_references(str(ledger))
-    assert checked == 2
+    assert checked == 1
     assert problems == []
+
+
+def test_verify_rejects_manual_rollback_to_older_evidenced_chain(wincreator, tmp_path):
+    ledger = tmp_path / "PROOF_LEDGER.md"
+    gate = tmp_path / "test.py"
+    attest_dir = tmp_path / ".wincreator" / "attestations"
+    _ledger(ledger)
+
+    gate.write_text("print('first pass')\n", encoding="utf-8")
+    _a1, first, code = wincreator.run_and_attest(
+        "P1", [sys.executable, str(gate)], ledger=str(ledger),
+        attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
+    )
+    assert code == 0
+    wincreator.review_attestation(first, "EVIDENCED", "skeptic", str(ledger))
+    older = wincreator.read_claim(str(ledger), "P1")
+
+    gate.write_text("raise SystemExit(1)\n", encoding="utf-8")
+    _a2, _second, code = wincreator.run_and_attest(
+        "P1", [sys.executable, str(gate)], ledger=str(ledger),
+        attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
+    )
+    assert code != 0
+    assert wincreator.read_claim(str(ledger), "P1")["status"] == "DISPROVEN"
+
+    # Simulate an agent trying to resurrect a previously valid proof after a
+    # newer failed attempt by copying the old status/evidence back into ledger.
+    wincreator.update_ledger(str(ledger), "P1", "EVIDENCED", older["evidence"])
+
+    checked, problems = wincreator.verify_ledger_references(str(ledger))
+    assert checked == 2
+    assert any("older proof chain" in problem for problem in problems)

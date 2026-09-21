@@ -113,3 +113,22 @@ def test_regulated_capture_rejects_gate_that_changes_git_state(
     assert code == 2
     assert attestation["payload"]["capture"]["status"] == "CAPTURE_ERROR"
     assert "changed Git state" in attestation["payload"]["capture"]["error"]
+
+
+def test_standard_capture_binds_dirty_worktree_contents(
+    wincreator, ledger, clean_git_repo, tmp_path
+):
+    ledger_path = clean_git_repo / "PROOF_LEDGER.md"
+    ledger_path.write_text(ledger.read_text(encoding="utf-8"), encoding="utf-8")
+    subprocess.run(["git", "add", "PROOF_LEDGER.md"], cwd=clean_git_repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "ledger"], cwd=clean_git_repo, check=True)
+
+    tracked = clean_git_repo / "seed.txt"
+    tracked.write_text("dirty-one\n", encoding="utf-8")
+    first = wincreator.git_context(str(clean_git_repo))
+    tracked.write_text("dirty-two\n", encoding="utf-8")
+    second = wincreator.git_context(str(clean_git_repo))
+
+    assert first["dirty"] is True
+    assert second["dirty"] is True
+    assert first["worktree_digest"] != second["worktree_digest"]

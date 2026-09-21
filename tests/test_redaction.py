@@ -57,3 +57,22 @@ def test_no_output_body_writes_empty_logs_and_keeps_sizes(wincreator, ledger, tm
     assert record["stored_bytes"] == 0
     resolved = wincreator._resolve_recorded_path(record["path"], str(path))
     assert Path(resolved).read_bytes() == b""
+
+
+def test_invalid_redaction_regex_fails_before_gate_execution(wincreator, ledger, tmp_path):
+    marker = tmp_path / "gate-ran.txt"
+    command = [
+        sys.executable,
+        "-c",
+        f"from pathlib import Path; Path({str(marker)!r}).write_text('ran')",
+    ]
+    import pytest
+    with pytest.raises(ValueError, match="invalid --redact-regex"):
+        prove(
+            wincreator,
+            ledger,
+            tmp_path,
+            command=command,
+            redact_regex=["("],
+        )
+    assert not marker.exists()

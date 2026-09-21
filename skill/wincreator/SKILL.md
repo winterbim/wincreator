@@ -50,7 +50,7 @@ stakes turn out higher, never silently.
 | Tier | Use when | What you actually do |
 |---|---|---|
 | **Lite** (default) | one claim, one gate, result checkable right now | announce and execute the gate; use `--tier lite --auto-approve-lite` only when a separate review would add no value. |
-| **Standard** | multi-step work whose failure would be expensive or silent | Loop Panel + ledger + captured gate + a separate `review` on critical claims + `ledger_check.py`. |
+| **Standard** | multi-step work whose failure would be expensive or silent | Loop Panel + ledger + captured gate + a separate reviewer identifier on critical claims + `ledger_check.py`. |
 | **Regulated** | audited, contractual, safety- or compliance-relevant work | Standard + Git state unchanged before/after the gate, distinct Builder/reviewer identifiers, captured attestations, retained artifacts, and human sign-off enforced by the surrounding review process. Mark CI reviews `--automatic`; they are not human approval. |
 
 If you cannot name why the task needs Standard, it is a Lite task.
@@ -201,8 +201,9 @@ python3 scripts/wincreator.py review P-014 \
 Review may record `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. `INSUFFICIENT`
 is a first-class blocking ledger status; it cannot be mistaken for an ordinary
 waiting state.
-`CAPTURED_FAIL` can never become `EVIDENCED`; in Regulated mode the Builder
-cannot review their own capture. Pass `--automatic` for CI/tool review and
+`CAPTURED_FAIL` can never become `EVIDENCED`; in Standard and Regulated modes
+the Builder cannot review their own capture. A review is immutable once written;
+changing a verdict requires a fresh capture. Pass `--automatic` for CI/tool review and
 obtain authenticated human sign-off outside the CLI when policy requires it.
 The capture binds the exact ID, level, claim text and gate, so changing any of
 them invalidates `verify`.
@@ -214,7 +215,8 @@ gate. Use `--optional-file` for optional inputs. Protect sensitive output with
 only after the process exits. A Standard capture outside Git warns when it has
 no `--file`, because then no source snapshot is bound to the claim. Read
 `references/attestation.md` and validate the machine schema at
-`schemas/attestation-v1.schema.json` for Regulated work.
+`schemas/attestation-v1.schema.json` and `schemas/review-v1.schema.json` for
+Regulated work.
 
 ## Builder/Skeptic separation (defense against optimism leak)
 

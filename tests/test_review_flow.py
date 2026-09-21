@@ -89,3 +89,65 @@ def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
     review = json.loads((Path(path).parent / "review.json").read_text(encoding="utf-8"))
     assert code == 0
     assert review["payload"]["automatic"] is True
+
+
+def test_cli_rejects_capture_from_different_claim(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    code = wincreator.main([
+        "review",
+        "P2",
+        "--attestation",
+        str(path),
+        "--ledger",
+        str(ledger),
+        "--verdict",
+        "evidenced",
+        "--reviewer",
+        "skeptic-02",
+    ])
+    assert code == 2
+    assert not (Path(path).parent / "review.json").exists()
+    assert wincreator.read_claim(str(ledger), "P1")["status"] == "PENDING"
+
+
+def test_standard_builder_cannot_review_own_capture(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(
+        wincreator,
+        ledger,
+        tmp_path,
+        builder="same-person",
+    )
+    with pytest.raises(ValueError, match="must differ"):
+        wincreator.review_attestation(
+            str(path),
+            verdict="EVIDENCED",
+            reviewer="same-person",
+            ledger=str(ledger),
+        )
+
+
+def test_review_is_immutable_once_written(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    wincreator.review_attestation(
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+    )
+    with pytest.raises(FileExistsError, match="immutable review"):
+        wincreator.review_attestation(
+            str(path), verdict="DISPROVEN", reviewer="skeptic-02", ledger=str(ledger)
+        )
+
+
+def test_review_schema_rejects_recomputed_unknown_fields(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    _review, review_path = wincreator.review_attestation(
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+    )
+    review_path = Path(review_path)
+    document = json.loads(review_path.read_text(encoding="utf-8"))
+    document["payload"]["unauthorized_field"] = "forged"
+    document["digest"]["value"] = wincreator.canonical_digest(document["payload"])
+    review_path.write_text(json.dumps(document), encoding="utf-8")
+
+    ok, problems = wincreator.verify_review(str(review_path), str(path))
+    assert not ok
+    assert any("schema-invalid" in problem for problem in problems)
