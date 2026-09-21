@@ -24,17 +24,21 @@ python3 scripts/wincreator.py verify --ledger PROOF_LEDGER.md
 
 Review verdicts are `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. A review
 records the capture digest, reviewer, timestamp, verdict, and a separate
-canonical digest. Regulated mode rejects a reviewer whose identifier equals
-the Builder identifier. `INSUFFICIENT` is written to the ledger as a distinct,
+canonical digest. Standard and Regulated modes reject a reviewer whose
+identifier equals the Builder identifier. Reviews are immutable once written;
+a changed verdict requires a fresh capture. `INSUFFICIENT` is written to the ledger as a distinct,
 blocking status; it is never collapsed into the non-blocking `PENDING` state.
 CI and tool-driven reviews must pass `--automatic`, which records
 `automatic: true`; that marker is not a substitute for authenticated human
 approval in the surrounding PR or compliance process.
 
-## Canonical capture schema
+## Canonical schemas
 
-`schemas/attestation-v1.schema.json` is authoritative. The top-level fields
-are exactly:
+`schemas/attestation-v1.schema.json` is authoritative for captures and
+`schemas/review-v1.schema.json` is authoritative for reviews. Both are validated
+before persistence and again during verification.
+
+For captures, the top-level fields are exactly:
 
 ```json
 {
@@ -89,7 +93,8 @@ are exactly:
       "dirty": false,
       "remote": "https://github.com/winterbim/wincreator",
       "submodules": "",
-      "untracked_digest": "..."
+      "untracked_digest": "...",
+      "worktree_digest": "..."
     },
     "environment": {
       "platform": "Linux-...",
@@ -129,21 +134,26 @@ aliases `ended_at`, `alg`, or `node`.
 ## Git and file policy
 
 Git context includes the commit, tree, branch, dirty state, remote, recursive
-submodule status, and a digest of untracked paths/content. Regulated capture
-fails closed unless Git inspection succeeds and the complete Git context is
-unchanged before and after the command runs.
+submodule status, a digest of untracked paths/content, and a `worktree_digest`
+covering changed tracked plus untracked file contents. Regulated capture fails
+closed unless Git inspection succeeds and the complete Git context is unchanged
+before and after the command runs.
 
 A path declared with `--file` is mandatory: if it is missing, capture stops
 before the gate. Use `--optional-file` only when absence is allowed and must
 be recorded.
 
 Run directories use microseconds plus a UUID and are created exclusively, so
-concurrent captures for one claim do not collide.
+concurrent captures for one claim do not collide. Ledger updates use a mutable
+proof-state compare-and-swap: an overlapping capture that finishes against a
+stale row is refused and its unapplied run directory is discarded.
 
-Stored stdout/stderr paths, the ledger name, and the review capture reference
-are relative so an exported attestation bundle remains verifiable after it is
-moved or downloaded. Retain the `attestations/` tree, ledger, and every declared
-file at its recorded relative path inside the bundle.
+Stored stdout/stderr names are confined to their capture directory, and the
+ledger/review references are portable. Declared evidence files are recorded
+relative to the capture working directory when they live under it; files outside
+that root remain absolute and therefore are not relocation-portable. Retain the
+`attestations/` tree, ledger, and every declared relative file at its recorded
+path when exporting a bundle.
 
 ## Output and privacy policy
 
