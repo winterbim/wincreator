@@ -11,8 +11,10 @@ CAPTURED_PASS -> INSUFFICIENT -> CAPTURED_FAIL / DISPROVEN -> fix -> CAPTURED_PA
 - every historical attestation is still digest/signature/artifact checked;
 - every historical review is still checked against the capture it reviewed;
 - claim identity (ID, level, text, gate, row digest) must remain unchanged across the history;
-- only the newest valid proof chain for a claim defines the ledger's current status and evidence;
+- only the newest **applied** valid proof chain for a claim defines the ledger's current status and evidence;
 - if that newest chain is `PENDING`, `DISPROVEN`, `INSUFFICIENT`, or `BLOCKED`, verification still fails;
 - tampering with an older capture still fails verification even after a newer claim becomes `EVIDENCED`.
 
-This preserves negative attempts as audit evidence without requiring the current ledger row to pretend that an earlier state is still current.
+An applied chain is one that successfully won the atomic ledger state transition. Overlapping captures use a proof-state compare-and-swap; a stale capture is refused and its unapplied run directory is discarded rather than becoming ambiguous history. Verification also rejects a ledger that is manually rolled back to an older valid chain after a newer applied attempt.
+
+This preserves negative attempts as audit evidence without allowing an earlier success to resurrect a claim after newer evidence changed its state.
