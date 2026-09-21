@@ -68,7 +68,7 @@ python3 "$WC/scripts/quick_prove.py" \
 
 A green command becomes `PENDING`, not `EVIDENCED`.
 
-The capture prints the generated claim ID. A separate reviewer then evaluates whether the captured gate really proves the claim:
+The capture prints the generated claim ID. A separate reviewer, with an identifier different from the Builder, then evaluates whether the captured gate really proves the claim:
 
 ```bash
 python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
@@ -159,7 +159,7 @@ python3 "$WC/scripts/quick_prove.py" \
   -- python3 check_integration.py
 ```
 
-Redaction occurs before retained output is hashed. The gate process never inherits `WINCREATOR_SIGNING_KEY`; signing happens only after the gate exits.
+Redaction rules are validated before the gate starts, then applied before retained output is hashed. The gate process never inherits `WINCREATOR_SIGNING_KEY`; signing happens only after the gate exits.
 
 ## Other installation paths
 
