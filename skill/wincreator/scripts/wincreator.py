@@ -858,6 +858,11 @@ def review_attestation(
         raise ValueError(f"{tier.title()} builder and reviewer must differ")
     if automatic and tier != "lite":
         raise ValueError("automatic review is only allowed in Lite mode")
+    review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
+    if os.path.exists(review_path):
+        raise FileExistsError(
+            "capture already has an immutable review; create a new capture to change verdict"
+        )
     if ledger:
         ledger = os.path.abspath(ledger)
         current = read_claim(ledger, payload["claim"]["id"])
@@ -877,11 +882,6 @@ def review_attestation(
                 f"capture for claim {payload['claim']['id']} is stale or no longer current; "
                 "review refused"
             )
-    review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
-    if os.path.exists(review_path):
-        raise FileExistsError(
-            "capture already has an immutable review; create a new capture to change verdict"
-        )
     reviewed_at = iso_time(utc_now())
     review_payload = {
         "tool_version": VERSION,
