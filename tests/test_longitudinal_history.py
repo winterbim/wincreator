@@ -121,8 +121,13 @@ def test_verify_tracks_ledger_evidence_when_overlapping_captures_finish_out_of_s
         import time
         time.sleep(0.05)
         fast_future = pool.submit(capture, fast)
-        slow_future.result()
         fast_future.result()
+        try:
+            slow_future.result()
+        except RuntimeError as error:
+            assert "stale result not applied" in str(error)
+        else:
+            raise AssertionError("older overlapping capture was allowed to overwrite newer proof state")
 
     current = wincreator.read_claim(str(ledger), "P1")
     assert current["status"] == "EVIDENCED"
