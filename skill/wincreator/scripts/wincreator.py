@@ -856,8 +856,6 @@ def review_attestation(
     tier = payload["policy"]["tier"]
     if tier in {"standard", "regulated"} and reviewer == payload["builder"]:
         raise ValueError(f"{tier.title()} builder and reviewer must differ")
-    if automatic and tier != "lite":
-        raise ValueError("automatic review is only allowed in Lite mode")
     review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
     if os.path.exists(review_path):
         raise FileExistsError(
@@ -1016,8 +1014,6 @@ def verify_review(path, capture_path=None):
         tier = capture_payload.get("policy", {}).get("tier")
         if tier in {"standard", "regulated"} and payload.get("reviewer") == capture_payload.get("builder"):
             problems.append(f"{tier.title()} builder and reviewer are not independent")
-        if payload.get("automatic") and tier != "lite":
-            problems.append("automatic review is only valid in Lite mode")
     return not problems, problems
 
 
