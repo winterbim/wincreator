@@ -71,7 +71,7 @@ def test_insufficient_review_blocks_completion(wincreator, ledger_check, ledger,
     assert ledger_check.check(str(ledger)) == 1
 
 
-def test_cli_rejects_automatic_standard_review(wincreator, ledger, tmp_path):
+def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
     _attestation, path, _code = prove(wincreator, ledger, tmp_path)
     code = wincreator.main([
         "review",
@@ -86,9 +86,9 @@ def test_cli_rejects_automatic_standard_review(wincreator, ledger, tmp_path):
         "ci-skeptic",
         "--automatic",
     ])
-    assert code == 2
-    assert not (Path(path).parent / "review.json").exists()
-    assert wincreator.read_claim(str(ledger), "P1")["status"] == "PENDING"
+    review = json.loads((Path(path).parent / "review.json").read_text(encoding="utf-8"))
+    assert code == 0
+    assert review["payload"]["automatic"] is True
 
 
 def test_cli_rejects_capture_from_different_claim(wincreator, ledger, tmp_path):
