@@ -389,6 +389,7 @@ def _require(mapping, keys, label):
 
 
 _ATTESTATION_SCHEMA_CACHE = None
+_REVIEW_SCHEMA_CACHE = None
 
 
 def _schema_type_matches(value, expected):
@@ -470,6 +471,19 @@ def validate_attestation_document(document):
         document,
         _ATTESTATION_SCHEMA_CACHE,
         _ATTESTATION_SCHEMA_CACHE,
+    )
+    return True
+
+
+def validate_review_document(document):
+    global _REVIEW_SCHEMA_CACHE
+    if _REVIEW_SCHEMA_CACHE is None:
+        schema_path = Path(__file__).resolve().parents[1] / "schemas" / "review-v1.schema.json"
+        _REVIEW_SCHEMA_CACHE = json.loads(schema_path.read_text(encoding="utf-8"))
+    _validate_json_schema(
+        document,
+        _REVIEW_SCHEMA_CACHE,
+        _REVIEW_SCHEMA_CACHE,
     )
     return True
 
@@ -925,6 +939,7 @@ def review_attestation(
     signature = _signature(digest)
     if signature:
         review["signature"] = signature
+    validate_review_document(review)
     _atomic_json(review_path, review)
     if ledger:
         status = {
@@ -1011,14 +1026,11 @@ def verify_review(path, capture_path=None):
     problems = []
     try:
         review = _load_json(path)
-    except (OSError, json.JSONDecodeError) as error:
-        return False, [f"unreadable review: {error}"]
-    if review.get("schema") != REVIEW_SCHEMA:
-        return False, ["unsupported review schema"]
-    payload = review.get("payload")
-    digest = review.get("digest", {}).get("value")
-    if not isinstance(payload, dict) or not digest:
-        return False, ["malformed review"]
+        validate_review_document(review)
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        return False, [f"unreadable or schema-invalid review: {error}"]
+    payload = review["payload"]
+    digest = review["digest"]["value"]
     if canonical_digest(payload) != digest:
         problems.append("review digest mismatch")
     _check_signature(review, problems)
