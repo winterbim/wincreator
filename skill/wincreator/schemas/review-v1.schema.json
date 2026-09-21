@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/winterbim/wincreator/schemas/review-v1.schema.json",
+  "title": "WinCreator Review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "payload", "digest"],
+  "properties": {
+    "schema": {"const": "wincreator.review/v1"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_version", "claim", "capture_digest", "capture_path",
+        "capture_status", "verdict", "reviewer", "reviewed_at", "automatic"
+      ],
+      "properties": {
+        "tool_version": {"type": "string", "minLength": 1},
+        "claim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "level", "text", "gate", "row_sha256", "ledger_sha256_before", "status_before"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "level": {"type": "string"},
+            "text": {"type": "string"},
+            "gate": {"type": "string"},
+            "row_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+            "ledger_sha256_before": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+            "status_before": {"type": ["string", "null"]}
+          }
+        },
+        "capture_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "capture_path": {"type": "string", "minLength": 1},
+        "capture_status": {"enum": ["CAPTURED_PASS", "CAPTURED_FAIL", "CAPTURE_ERROR"]},
+        "verdict": {"enum": ["EVIDENCED", "INSUFFICIENT", "DISPROVEN"]},
+        "reviewer": {"type": "string", "minLength": 1},
+        "reviewed_at": {"type": "string", "minLength": 1},
+        "automatic": {"type": "boolean"}
+      }
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "value"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "canonicalization": {"const": "json/sorted-compact/utf-8"},
+        "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": {"const": "hmac-sha256"},
+        "key_id": {"type": "string", "pattern": "^[0-9a-f]{12}$"},
+        "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
