@@ -135,3 +135,19 @@ def test_review_is_immutable_once_written(wincreator, ledger, tmp_path):
         wincreator.review_attestation(
             str(path), verdict="DISPROVEN", reviewer="skeptic-02", ledger=str(ledger)
         )
+
+
+def test_review_schema_rejects_recomputed_unknown_fields(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    _review, review_path = wincreator.review_attestation(
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+    )
+    review_path = Path(review_path)
+    document = json.loads(review_path.read_text(encoding="utf-8"))
+    document["payload"]["unauthorized_field"] = "forged"
+    document["digest"]["value"] = wincreator.canonical_digest(document["payload"])
+    review_path.write_text(json.dumps(document), encoding="utf-8")
+
+    ok, problems = wincreator.verify_review(str(review_path), str(path))
+    assert not ok
+    assert any("schema-invalid" in problem for problem in problems)
