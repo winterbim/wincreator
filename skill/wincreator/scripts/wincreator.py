@@ -235,6 +235,19 @@ def claim_row_sha256(claim):
     return canonical_digest(identity)
 
 
+def claim_state_sha256(claim):
+    """Bind the mutable ledger state so stale captures cannot overwrite newer proof."""
+    state = {
+        "id": claim["id"],
+        "level": claim["level"],
+        "text": claim["text"],
+        "gate": claim["gate"],
+        "status": claim["status"],
+        "evidence": claim["evidence"],
+    }
+    return canonical_digest(state)
+
+
 def _read_claim_from_text(text, claim_id):
     lines = text.splitlines(keepends=True)
     matches = []
@@ -265,13 +278,25 @@ def read_claim(ledger_path, claim_id):
     return claim
 
 
-def update_ledger(ledger_path, claim_id, status, evidence, expected_row_sha=None):
+def update_ledger(
+    ledger_path,
+    claim_id,
+    status,
+    evidence,
+    expected_row_sha=None,
+    expected_state_sha=None,
+):
     with _file_lock(ledger_path):
         text = Path(ledger_path).read_text(encoding="utf-8")
         claim, lines, cells = _read_claim_from_text(text, claim_id)
         if expected_row_sha and claim["row_sha256"] != expected_row_sha:
             raise RuntimeError(
                 f"claim {claim_id} changed while its gate was running; ledger not updated"
+            )
+        if expected_state_sha and claim_state_sha256(claim) != expected_state_sha:
+            raise RuntimeError(
+                f"claim {claim_id} proof state changed while its gate was running; "
+                "stale result not applied"
             )
         old_status = claim["status"]
         cells[4] = status
@@ -494,6 +519,15 @@ def _resolve_recorded_path(recorded, attestation_path=None):
     return next((candidate for candidate in candidates if os.path.exists(candidate)), candidates[0])
 
 
+def _abspath_from(path, cwd):
+    if path is None:
+        return None
+    native = os.fspath(path)
+    if os.path.isabs(native):
+        return os.path.abspath(native)
+    return os.path.abspath(os.path.join(cwd, native))
+
+
 # ------------------------------------------------------------------- capture
 def _claim_snapshot(ledger, claim_id, cwd):
     if not ledger:
@@ -505,10 +539,10 @@ def _claim_snapshot(ledger, claim_id, cwd):
             "row_sha256": None,
             "ledger_sha256_before": None,
             "status_before": None,
-        }
+        }, None
     text = Path(ledger).read_text(encoding="utf-8")
     claim, _lines, _cells = _read_claim_from_text(text, claim_id)
-    return {
+    snapshot = {
         "id": claim["id"],
         "level": claim["level"],
         "text": claim["text"],
@@ -517,6 +551,7 @@ def _claim_snapshot(ledger, claim_id, cwd):
         "ledger_sha256_before": sha256_bytes(text.encode("utf-8")),
         "status_before": claim["status"],
     }
+    return snapshot, claim_state_sha256(claim)
 
 
 def _new_run_dir(attest_dir, claim_id, private):
@@ -594,12 +629,18 @@ def run_and_attest(
         raise ValueError("--auto-approve-lite is only valid in Lite mode")
     if max_output_bytes < 0:
         raise ValueError("max_output_bytes must be non-negative")
+    for pattern in redact_regex:
+        try:
+            re.compile(pattern)
+        except re.error as error:
+            raise ValueError(f"invalid --redact-regex {pattern!r}: {error}") from error
     cwd = os.path.abspath(cwd or os.getcwd())
-    ledger = os.path.abspath(ledger) if ledger else None
-    required_files = [os.path.abspath(path) for path in files]
-    optional_files = [os.path.abspath(path) for path in optional_files]
+    ledger = _abspath_from(ledger, cwd) if ledger else None
+    attest_dir = _abspath_from(attest_dir, cwd)
+    required_files = [_abspath_from(path, cwd) for path in files]
+    optional_files = [_abspath_from(path, cwd) for path in optional_files]
     file_entries = _file_entries(required_files, optional_files, cwd)
-    claim = _claim_snapshot(ledger, claim_id, cwd)
+    claim, claim_state_before = _claim_snapshot(ledger, claim_id, cwd)
     git = git_context(cwd)
     if tier == "regulated":
         if allow_dirty:
@@ -746,6 +787,7 @@ def run_and_attest(
             ledger_status,
             evidence,
             expected_row_sha=claim["row_sha256"],
+            expected_state_sha=claim_state_before,
         )
     if capture_status == "CAPTURED_PASS" and auto_approve_lite:
         if ledger:
@@ -779,16 +821,31 @@ def _load_json(path):
         return json.load(handle)
 
 
-def review_attestation(attestation_path, verdict, reviewer, ledger=None, automatic=False):
+def review_attestation(
+    attestation_path,
+    verdict,
+    reviewer,
+    ledger=None,
+    automatic=False,
+    expected_claim_id=None,
+):
     verdict = verdict.upper()
+    reviewer = str(reviewer).strip()
     if verdict not in {"EVIDENCED", "INSUFFICIENT", "DISPROVEN"}:
         raise ValueError(f"invalid review verdict: {verdict}")
+    if not reviewer:
+        raise ValueError("reviewer must be non-empty")
     ok, problems = verify_attestation(attestation_path)
     if not ok:
         raise ValueError("capture failed verification: " + "; ".join(problems))
     attestation = _load_json(attestation_path)
     payload = attestation["payload"]
     capture_status = payload["capture"]["status"]
+    if expected_claim_id and payload["claim"]["id"] != expected_claim_id:
+        raise ValueError(
+            f"requested claim {expected_claim_id} does not match capture claim "
+            f"{payload['claim']['id']}"
+        )
     if capture_status == "CAPTURED_FAIL" and verdict == "EVIDENCED":
         raise ValueError("CAPTURED_FAIL can never become EVIDENCED")
     if capture_status == "CAPTURE_ERROR" and verdict != "INSUFFICIENT":
@@ -796,8 +853,35 @@ def review_attestation(attestation_path, verdict, reviewer, ledger=None, automat
     if capture_status == "CAPTURED_PASS" and verdict == "DISPROVEN":
         # A reviewer can disprove the claim when the gate passed for the wrong reason.
         pass
-    if payload["policy"]["tier"] == "regulated" and reviewer == payload["builder"]:
-        raise ValueError("Regulated builder and reviewer must differ")
+    tier = payload["policy"]["tier"]
+    if tier in {"standard", "regulated"} and reviewer == payload["builder"]:
+        raise ValueError(f"{tier.title()} builder and reviewer must differ")
+    if automatic and tier != "lite":
+        raise ValueError("automatic review is only allowed in Lite mode")
+    if ledger:
+        ledger = os.path.abspath(ledger)
+        current = read_claim(ledger, payload["claim"]["id"])
+        expected_status = {
+            "CAPTURED_PASS": "PENDING",
+            "CAPTURED_FAIL": "DISPROVEN",
+            "CAPTURE_ERROR": "BLOCKED",
+        }[capture_status]
+        expected_evidence = capture_evidence_sentence(
+            payload,
+            attestation_path,
+            attestation["digest"]["value"],
+            os.path.dirname(ledger),
+        )
+        if current["status"] != expected_status or current["evidence"] != expected_evidence:
+            raise RuntimeError(
+                f"capture for claim {payload['claim']['id']} is stale or no longer current; "
+                "review refused"
+            )
+    review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
+    if os.path.exists(review_path):
+        raise FileExistsError(
+            "capture already has an immutable review; create a new capture to change verdict"
+        )
     reviewed_at = iso_time(utc_now())
     review_payload = {
         "tool_version": VERSION,
@@ -823,10 +907,8 @@ def review_attestation(attestation_path, verdict, reviewer, ledger=None, automat
     signature = _signature(digest)
     if signature:
         review["signature"] = signature
-    review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
     _atomic_json(review_path, review)
     if ledger:
-        ledger = os.path.abspath(ledger)
         status = {
             "EVIDENCED": "EVIDENCED",
             "INSUFFICIENT": "INSUFFICIENT",
@@ -877,7 +959,18 @@ def verify_attestation(path, check_artifacts=True):
     if check_artifacts:
         for stream_name in ("stdout", "stderr"):
             stream = payload[stream_name]
-            resolved = _resolve_recorded_path(stream["path"], path)
+            recorded_stream = stream["path"]
+            if (
+                os.path.isabs(recorded_stream)
+                or "/" in recorded_stream
+                or "\\" in recorded_stream
+                or recorded_stream in {".", ".."}
+            ):
+                problems.append(
+                    f"{stream_name} log path escapes capture directory: {recorded_stream}"
+                )
+                continue
+            resolved = os.path.join(os.path.dirname(os.path.abspath(path)), recorded_stream)
             if not os.path.isfile(resolved):
                 problems.append(f"{stream_name} log missing: {stream['path']}")
             elif sha256_file(resolved) != stream["sha256"]:
@@ -917,8 +1010,14 @@ def verify_review(path, capture_path=None):
             problems.append("review does not reference this capture digest")
         if payload.get("claim") != capture.get("payload", {}).get("claim"):
             problems.append("review claim does not match capture claim")
-        if capture.get("payload", {}).get("capture", {}).get("status") == "CAPTURED_FAIL" and payload.get("verdict") == "EVIDENCED":
+        capture_payload = capture.get("payload", {})
+        if capture_payload.get("capture", {}).get("status") == "CAPTURED_FAIL" and payload.get("verdict") == "EVIDENCED":
             problems.append("CAPTURED_FAIL was laundered into EVIDENCED")
+        tier = capture_payload.get("policy", {}).get("tier")
+        if tier in {"standard", "regulated"} and payload.get("reviewer") == capture_payload.get("builder"):
+            problems.append(f"{tier.title()} builder and reviewer are not independent")
+        if payload.get("automatic") and tier != "lite":
+            problems.append("automatic review is only valid in Lite mode")
     return not problems, problems
 
 
@@ -1123,6 +1222,7 @@ def cmd_review(args):
             args.reviewer,
             ledger=None if args.no_ledger else args.ledger,
             automatic=args.automatic,
+            expected_claim_id=args.claim_id,
         )
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
