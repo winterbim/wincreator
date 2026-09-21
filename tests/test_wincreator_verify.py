@@ -145,3 +145,41 @@ def test_capture_bundle_remains_verifiable_after_relocation(
     )
     assert checked == 1
     assert problems == []
+
+
+def test_relative_evidence_files_are_resolved_from_capture_cwd(wincreator, ledger, tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    project_ledger = project / "PROOF_LEDGER.md"
+    project_ledger.write_text(ledger.read_text(encoding="utf-8"), encoding="utf-8")
+    artifact = project / "report.ifc"
+    artifact.write_bytes(b"ifc-data")
+
+    attestation, path, code = wincreator.run_and_attest(
+        "P1",
+        ["python3", "-c", "print('ok')"],
+        ledger="PROOF_LEDGER.md",
+        files=["report.ifc"],
+        attest_dir=".wincreator/attestations",
+        cwd=str(project),
+        quiet=True,
+        tier="standard",
+        builder="builder-relative",
+    )
+    assert code == 0
+    assert attestation["payload"]["files"][0]["path"] == "report.ifc"
+    ok, problems = wincreator.verify_attestation(str(path))
+    assert ok, problems
+
+
+def test_verify_rejects_stream_path_escape_even_with_recomputed_digest(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    path = Path(path)
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["payload"]["stdout"]["path"] = "../stdout.log"
+    document["digest"]["value"] = wincreator.canonical_digest(document["payload"])
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    ok, problems = wincreator.verify_attestation(str(path))
+    assert not ok
+    assert any("escapes capture directory" in problem for problem in problems)
