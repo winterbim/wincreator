@@ -335,6 +335,23 @@ def _untracked_digest(cwd):
     return canonical_digest({"untracked": records})
 
 
+def _worktree_digest(cwd):
+    """Fingerprint dirty tracked + untracked content relative to HEAD."""
+    changed = _git(cwd, "diff", "--name-only", "-z", "HEAD", "--")
+    untracked = _git(cwd, "ls-files", "--others", "--exclude-standard", "-z")
+    if changed is None or untracked is None:
+        return None
+    records = []
+    paths = set(item for item in changed.split("\0") if item)
+    paths.update(item for item in untracked.split("\0") if item)
+    for relative in sorted(paths):
+        path = os.path.join(cwd, relative)
+        records.append(
+            [portable_path(relative), sha256_file(path) if os.path.isfile(path) else None]
+        )
+    return canonical_digest({"worktree": records})
+
+
 def git_context(cwd):
     commit = _git(cwd, "rev-parse", "HEAD")
     if commit is None:
@@ -344,8 +361,10 @@ def git_context(cwd):
     branch = _git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
     submodules = _git(cwd, "submodule", "status", "--recursive")
     untracked_digest = _untracked_digest(cwd)
+    worktree_digest = _worktree_digest(cwd)
     if (status is None or tree is None or branch is None
-            or submodules is None or untracked_digest is None):
+            or submodules is None or untracked_digest is None
+            or worktree_digest is None):
         return {"available": False}
     return {
         "available": True,
@@ -356,6 +375,7 @@ def git_context(cwd):
         "remote": _git(cwd, "config", "--get", "remote.origin.url"),
         "submodules": submodules,
         "untracked_digest": untracked_digest,
+        "worktree_digest": worktree_digest,
     }
 
 
