@@ -9,6 +9,35 @@ frontmatter intentionally contains only `name` and `description`. A tag or
 release is authoritative only after it exists on GitHub. The v2 development
 history remains available in Git and is not restated here.
 
+## [Unreleased]
+
+### Added
+- Machine-checkable `schemas/review-v1.schema.json`; review records are now
+  schema-validated before persistence and during verification.
+- Dirty-worktree content fingerprinting in capture Git context, covering changed
+  tracked files as well as untracked files.
+- Adversarial regressions for claim/attestation mismatch, self-review,
+  immutable reviews, invalid redaction regexes, relative evidence paths,
+  stream-path escape, concurrent stale captures, and historical proof rollback.
+
+### Fixed
+- Standard and Regulated reviews now reject Builder/Reviewer identity reuse.
+- CLI review is bound to the claim ID of the selected capture; a capture for a
+  different claim cannot be reviewed accidentally or deliberately.
+- Overlapping proof attempts can no longer let a stale finisher overwrite newer
+  ledger state; failed compare-and-swap captures are discarded before joining
+  proof history.
+- Verification rejects restoring an older valid proof chain after a newer
+  applied attempt changed the claim state.
+- Invalid redaction regexes fail before the gate command executes.
+- Relative ledger, attestation-root, and evidence-file paths are resolved from
+  the declared capture working directory, while stdout/stderr paths are confined
+  to the capture directory.
+
+### Changed
+- Reviews are immutable per capture. A different verdict requires a new capture,
+  preserving the audit trail instead of rewriting it in place.
+
 ## [3.0.2] — 2026-08-26
 
 Production-readiness close-out after an external-style end-to-end trial.
