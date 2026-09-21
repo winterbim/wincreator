@@ -18,6 +18,7 @@ from pathlib import Path
 import platform
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -815,14 +816,21 @@ def run_and_attest(
             ledger_status = "DISPROVEN"
         else:
             ledger_status = "BLOCKED"
-        update_ledger(
-            ledger,
-            claim_id,
-            ledger_status,
-            evidence,
-            expected_row_sha=claim["row_sha256"],
-            expected_state_sha=claim_state_before,
-        )
+        try:
+            update_ledger(
+                ledger,
+                claim_id,
+                ledger_status,
+                evidence,
+                expected_row_sha=claim["row_sha256"],
+                expected_state_sha=claim_state_before,
+            )
+        except (RuntimeError, KeyError, ValueError):
+            # A capture that lost the compare-and-swap race never became ledger
+            # history. Remove its run directory so longitudinal verification
+            # cannot mistake an unapplied branch for the current proof lineage.
+            shutil.rmtree(run_dir, ignore_errors=True)
+            raise
     if capture_status == "CAPTURED_PASS" and auto_approve_lite:
         if ledger:
             review_attestation(
@@ -950,13 +958,23 @@ def review_attestation(
         evidence = review_evidence_sentence(
             payload, attestation_path, attestation["digest"]["value"], review, review_path, os.path.dirname(ledger)
         )
-        update_ledger(
-            ledger,
-            payload["claim"]["id"],
-            status,
-            evidence,
-            expected_row_sha=payload["claim"]["row_sha256"],
-        )
+        try:
+            update_ledger(
+                ledger,
+                payload["claim"]["id"],
+                status,
+                evidence,
+                expected_row_sha=payload["claim"]["row_sha256"],
+                expected_state_sha=claim_state_sha256(current),
+            )
+        except (RuntimeError, KeyError, ValueError):
+            # Review files represent applied review transitions. If the ledger
+            # changed after the pre-check, do not leave an orphan review behind.
+            try:
+                os.unlink(review_path)
+            except OSError:
+                pass
+            raise
     return review, review_path
 
 
@@ -1152,6 +1170,7 @@ def verify_ledger_references(ledger_path):
             {
                 "claim_id": claim["id"],
                 "started_at": payload["started_at"],
+                "finished_at": payload["finished_at"],
                 "capture_path": capture_path,
                 "current": current,
                 "expected_status": expected_status,
@@ -1179,6 +1198,13 @@ def verify_ledger_references(ledger_path):
             )
             continue
         entry = matches[0]
+        newest = max(entries, key=lambda item: item["finished_at"])
+        if entry is not newest:
+            problems.append(
+                f"{ledger_path}: row {claim_id} points to an older proof chain; "
+                f"newest applied capture is {newest['finished_at']}"
+            )
+            continue
         expected_status = entry["expected_status"]
         if current["status"] != expected_status:
             problems.append(
