@@ -911,13 +911,12 @@ def review_attestation(
             "CAPTURED_FAIL": "DISPROVEN",
             "CAPTURE_ERROR": "BLOCKED",
         }[capture_status]
-        expected_evidence = capture_evidence_sentence(
-            payload,
-            attestation_path,
-            attestation["digest"]["value"],
-            os.path.dirname(ledger),
-        )
-        if current["status"] != expected_status or current["evidence"] != expected_evidence:
+        current_ref = ATTESTATION_REF.search(current["evidence"])
+        current_digest = current_ref.group("digest") if current_ref else None
+        if (
+            current["status"] != expected_status
+            or current_digest != attestation["digest"]["value"]
+        ):
             raise RuntimeError(
                 f"capture for claim {payload['claim']['id']} is stale or no longer current; "
                 "review refused"
