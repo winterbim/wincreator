@@ -115,19 +115,36 @@ def test_narrow_scope_still_tracks_ancestor_manifest(tmp_path):
     assert report["verdict"] == "REVIEW_REQUIRED"
 
 
-def test_cargo_subtables_and_target_dependencies_are_seen(tmp_path):
+def test_unparsed_manifests_fail_closed_on_change(tmp_path):
     distill = load_distill()
-    cargo = tmp_path / "Cargo.toml"
-    cargo.write_text(
-        "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n"
-        "[dependencies.serde]\nversion = \"1\"\n"
-        "[target.'cfg(unix)'.dependencies]\nlibc = \"0.2\"\n"
-        "[target.'cfg(windows)'.dependencies.winapi]\nversion = \"0.3\"\n",
-        encoding="utf-8",
-    )
+    cases = {
+        "Cargo.toml": (
+            "[package] # comment\nname = \"demo\"\n"
+            "[dependencies] # runtime\nserde = \"1\"\n"
+        ),
+        "pyproject.toml": (
+            "[project]\nname = \"demo\"\n"
+            "dependencies = [\"requests[security]>=2\"]\n"
+        ),
+        "go.mod": "module example.com/demo\n\nrequire(\nexample.com/a v1.0.0\n)\n",
+    }
 
-    snap = distill.build_snapshot(tmp_path)
+    for name, content in cases.items():
+        root = tmp_path / name.replace(".", "-")
+        root.mkdir()
+        path = root / name
+        path.write_text(content, encoding="utf-8")
+        before = distill.build_snapshot(root)
 
-    assert "cargo:serde" in snap["dependencies"]
-    assert "cargo:libc" in snap["dependencies"]
-    assert "cargo:winapi" in snap["dependencies"]
+        unchanged, _current = distill.compare_snapshot(
+            before, root, before["digest"]
+        )
+        assert "unparsed_manifest_changes" not in unchanged["regressed_dimensions"]
+
+        path.write_text(content + "\n# changed\n", encoding="utf-8")
+        changed, _current = distill.compare_snapshot(
+            before, root, before["digest"]
+        )
+        assert changed["verdict"] == "REVIEW_REQUIRED"
+        assert "unparsed_manifest_changes" in changed["regressed_dimensions"]
+        assert changed["dependency_changes"]["unparsed_manifest_changes"] == [name]
