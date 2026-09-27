@@ -210,6 +210,16 @@ Build or download `skill.zip`, then upload it:
 
 Release assets: [latest release](https://github.com/winterbim/wincreator/releases/latest).
 
+Release packages are also published with GitHub/Sigstore build-provenance
+attestations. After downloading an artifact, verify where it came from with:
+
+```bash
+gh attestation verify skill.zip -R winterbim/wincreator
+```
+
+That provenance proves which repository/workflow/commit produced the artifact;
+it does not replace WinCreator's semantic proof ledger or claim review.
+
 ## Development gates
 
 ```bash
