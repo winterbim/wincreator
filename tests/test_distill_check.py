@@ -148,3 +148,42 @@ def test_unparsed_manifests_fail_closed_on_change(tmp_path):
         assert changed["verdict"] == "REVIEW_REQUIRED"
         assert "unparsed_manifest_changes" in changed["regressed_dimensions"]
         assert changed["dependency_changes"]["unparsed_manifest_changes"] == [name]
+
+
+def test_requirements_includes_and_editables_fail_closed(tmp_path):
+    distill = load_distill()
+    for body in (
+        "-r requirements/base.txt\n",
+        "--requirement requirements/base.txt\n",
+        "-e ./pkg-a\n",
+        "--editable ./pkg-a\n",
+    ):
+        root = tmp_path / str(abs(hash(body)))
+        root.mkdir()
+        (root / "requirements.txt").write_text(body, encoding="utf-8")
+        before = distill.build_snapshot(root)
+        assert any("unsupported requirements syntax" in w for w in before["warnings"])
+        report, _current = distill.compare_snapshot(before, root, before["digest"])
+        assert report["verdict"] == "REVIEW_REQUIRED"
+        assert "scan_warnings" in report["regressed_dimensions"]
+
+
+def test_symlink_directory_is_reported_and_forces_review(tmp_path):
+    distill = load_distill()
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "module.py").write_text("print('ok')\n", encoding="utf-8")
+    before = distill.build_snapshot(tmp_path)
+
+    link = tmp_path / "linked-source"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        import pytest
+        pytest.skip("directory symlinks unavailable in this environment")
+
+    current = distill.build_snapshot(tmp_path)
+    assert any("symlink directory ignored" in w for w in current["warnings"])
+    report, _current = distill.compare_snapshot(before, tmp_path, before["digest"])
+    assert report["verdict"] == "REVIEW_REQUIRED"
+    assert "scan_warnings" in report["regressed_dimensions"]
