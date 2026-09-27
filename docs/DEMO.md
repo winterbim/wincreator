@@ -65,6 +65,7 @@ python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
   --ledger .wincreator/PROOF_LEDGER.md \
   --verdict insufficient \
   --reviewer demo-skeptic
+  --challenge "attack whether the captured gate is sufficient for the exact claim" \
 ```
 
 Say:
