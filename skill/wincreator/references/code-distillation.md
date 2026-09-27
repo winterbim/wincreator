@@ -41,6 +41,23 @@ python3 scripts/distill_check.py snapshot \
   --out .wincreator/distill-before.json
 ~~~
 
+The command prints the baseline SHA-256. **Freeze that digest before editing
+source.** For Standard/Regulated work, bind the baseline file to an ordinary
+WinCreator capture (or another independently retained immutable record) before
+the simplification starts. A digest stored only inside the mutable baseline JSON
+is not authentication.
+
+The helper has an explicit verification command suitable for that pre-change
+capture:
+
+~~~
+python3 scripts/distill_check.py verify \
+  --snapshot .wincreator/distill-before.json \
+  --expect-digest <printed-baseline-sha256>
+~~~
+
+A baseline captured or re-created after seeing the comparison result is invalid.
+
 Then simplify without changing the intended behavior. Remove avoidable
 duplication, speculative abstractions, unused flexibility and dependencies that
 do not buy enough value.
@@ -50,13 +67,16 @@ Compare the result:
 ~~~
 python3 scripts/distill_check.py compare \
   --before .wincreator/distill-before.json \
+  --baseline-digest <previously-frozen-baseline-sha256> \
   --root . \
   --out .wincreator/distill-report.json
 ~~~
 
 The snapshot embeds the normalized policy and its SHA-256 digest. Compare
-reuses that embedded policy, so an agent cannot make a regression disappear by
-quietly changing the rules after seeing the result.
+reuses that embedded policy and requires the separately retained baseline
+digest. This catches a changed baseline only when that external digest was
+actually frozen before the cleanup; WinCreator does not pretend an unkeyed hash
+stored beside mutable data is an authentication boundary.
 
 Finally rerun the real behavior gate and bind the structural artifacts into the
 ordinary WinCreator attestation:
@@ -105,7 +125,9 @@ duplicate_min_chars. Unknown policy keys are rejected.
 
 The default scanner recognizes npm package.json dependencies, Python
 requirements files and common project.dependencies arrays in pyproject.toml,
-plus direct Cargo.toml and go.mod dependencies. This is intentionally a small
+plus direct Cargo.toml and go.mod dependencies. When source scope is narrowed,
+manifest discovery still walks the scope's ancestor directories up to the
+declared root, so a root or package-level manifest is not silently dropped. This is intentionally a small
 direct-dependency surface, not a package-manager replacement.
 
 ## Skeptic questions
