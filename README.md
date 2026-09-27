@@ -75,6 +75,7 @@ python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
   --ledger .wincreator/PROOF_LEDGER.md \
   --verdict evidenced \
   --reviewer skeptic-01
+  --challenge "attack whether the captured gate is sufficient for the exact claim" \
 ```
 
 The reviewer may instead record `INSUFFICIENT` or `DISPROVEN`.
@@ -163,6 +164,7 @@ python3 "$WC/scripts/wincreator.py" review P2 \
   --ledger PROOF_LEDGER.md \
   --verdict evidenced \
   --reviewer skeptic-01
+  --challenge "attack whether the captured gate is sufficient for the exact claim" \
 ```
 
 Verify capture logs, review linkage and ledger bindings:
