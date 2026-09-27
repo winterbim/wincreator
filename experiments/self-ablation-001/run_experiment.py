@@ -10,7 +10,7 @@ VISIBLE = [
 ]
 
 ADVERSARIAL = [
-    ("escaped_pipe", r"""| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| P1 | Micro | value contains \| pipe | pytest | EVIDENCED | raw pass |\n""", ["P1"], "value contains | pipe"),
+    ("escaped_pipe", """| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| P1 | Micro | value contains \| pipe | pytest | EVIDENCED | raw pass |\n""", ["P1"], "value contains | pipe"),
     ("fenced_example", """\x60\x60\x60markdown\n| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| FAKE | Micro | example | pytest | EVIDENCED | pass |\n\x60\x60\x60\n\n| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| REAL | Micro | live | pytest | EVIDENCED | pass |\n""", ["REAL"], None),
     ("foreign_table", """| Name | Status |\n|------|--------|\n| deploy | CLAIMED |\n\n| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| P1 | Meso | live | pytest | EVIDENCED | pass |\n""", ["P1"], None),
     ("blank_line_ends", """| ID | Level | Claim | Gate (what proves it) | Status | Evidence |\n|----|-------|-------|------------------------|--------|----------|\n| P1 | Micro | live | pytest | EVIDENCED | pass |\n\n| P2 | Micro | detached | pytest | CLAIMED | |\n""", ["P1"], None),
