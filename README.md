@@ -254,6 +254,7 @@ python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
 python3 skill/wincreator/scripts/distill_check.py --self-test
 python3 skill/wincreator/scripts/adequacy_check.py self-test
+python3 skill/wincreator/scripts/challenge_packet.py self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
