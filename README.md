@@ -222,6 +222,25 @@ gh attestation verify skill.zip -R winterbim/wincreator
 That provenance proves which repository/workflow/commit produced the artifact;
 it does not replace WinCreator's semantic proof ledger or claim review.
 
+
+## Test the tests
+
+For high-value coding claims, WinCreator can also check whether the declared
+behavior gate is capable of detecting a seeded regression:
+
+```bash
+python3 "$WC/scripts/adequacy_check.py" run \
+  --root . \
+  --manifest .wincreator/adequacy.json \
+  --out .wincreator/adequacy-report.json \
+  -- python3 -m pytest -q
+```
+
+The baseline must be green first. If a required controlled mutation still
+passes, the verdict is `INSUFFICIENT`. This is deliberately narrower than a
+full mutation-testing framework; use a mature ecosystem mutator when one is
+already available and bind its report as WinCreator evidence.
+
 ## Development gates
 
 ```bash
@@ -229,6 +248,7 @@ python3 -m compileall -q skill/wincreator/scripts tools tests
 python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
 python3 skill/wincreator/scripts/distill_check.py --self-test
+python3 skill/wincreator/scripts/adequacy_check.py self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
