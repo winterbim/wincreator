@@ -133,10 +133,12 @@ python3 "$WC/scripts/distill_check.py" snapshot \
 
 python3 "$WC/scripts/distill_check.py" compare \
   --before .wincreator/distill-before.json \
+  --baseline-digest <digest-frozen-before-editing> \
   --root . \
   --out .wincreator/distill-report.json
 ~~~
 
+Freeze the printed baseline digest in pre-change evidence before simplifying.
 Any new direct dependency, measured structural regression, or scan warning
 becomes **REVIEW_REQUIRED**. The final functional proof is still run through
 WinCreator and can bind both JSON artifacts with `--file`. See
@@ -228,7 +230,7 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 
 | Resource | Purpose |
 |---|---|
-| [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |\n| [`skill/wincreator/scripts/distill.py`](skill/wincreator/scripts/distill.py) | structural-cost before/after gate; never a correctness score |
+| [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |
 | [`skill/wincreator/scripts/distill_check.py`](skill/wincreator/scripts/distill_check.py) | structural before/after evidence for code distillation |
 | [`skill/wincreator/references/code-distillation.md`](skill/wincreator/references/code-distillation.md) | distillation doctrine, workflow and limits |
 | [`examples/minimal/`](examples/minimal/) | runnable sandbox |
