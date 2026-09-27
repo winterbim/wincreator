@@ -12,6 +12,7 @@ history remains available in Git and is not restated here.
 ## [Unreleased]
 
 ### Added
+- Blind Challenge Packet + review v3: Standard/Regulated reviews must bind a retained, digest-verified reviewer packet that omits Builder identity/context metadata; historical review v1/v2 records remain verifiable.
 - Evidence Adequacy Gate: deterministic isolated fault injection verifies that a declared behavior gate can actually detect claim-relevant seeded regressions; required survivors produce `INSUFFICIENT` and reports are digest-bound.
 
 ## [3.1.0] — 2026-09-27
