@@ -10,7 +10,7 @@ from conftest import prove
 def reviewed_capture(wincreator, ledger, tmp_path):
     attestation, path, _code = prove(wincreator, ledger, tmp_path)
     wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
     )
     return attestation, Path(path)
 
@@ -121,7 +121,7 @@ def test_capture_bundle_remains_verifiable_after_relocation(
     wincreator.review_attestation(
         path,
         verdict="EVIDENCED",
-        reviewer="portable-skeptic",
+        reviewer="portable-skeptic", challenge="test falsification challenge",
         ledger=str(bundled_ledger),
     )
     relative_attestation = Path(path).relative_to(bundle)
