@@ -40,6 +40,7 @@ jobs:
           python skill/wincreator/scripts/challenge_packet.py self-test
           python bench/run_ablation.py --self-test
           python bench/validate_cases.py
+          python bench/adapters/codex_exec.py --self-test
           python skill/wincreator/scripts/package_check.py --self-test
       - name: Run external adversarial suite
         run: python -m pytest -q
