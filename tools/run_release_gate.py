@@ -16,12 +16,14 @@ def run(command):
 
 
 def main():
-    run([PYTHON, "-m", "compileall", "-q", "skill/wincreator/scripts", "tools", "tests"])
+    run([PYTHON, "-m", "compileall", "-q", "skill/wincreator/scripts", "tools", "tests", "bench"])
     run([PYTHON, "skill/wincreator/scripts/ledger_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/wincreator.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/distill_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/adequacy_check.py", "self-test"])
     run([PYTHON, "skill/wincreator/scripts/challenge_packet.py", "self-test"])
+    run([PYTHON, "bench/run_ablation.py", "--self-test"])
+    run([PYTHON, "bench/validate_cases.py"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "skill/wincreator"])
     for ledger in (
