@@ -281,13 +281,13 @@ python3 scripts/wincreator.py prove P-014 \
 ```
 
 Capture produces `CAPTURED_PASS`, `CAPTURED_FAIL`, or `CAPTURE_ERROR`. A pass
-remains `PENDING` in Standard/Regulated because exit 0 proves only that the
-command succeeded, not that the command proves the claim. Review the exact
-capture separately:
+remains `PENDING` in Standard/Regulated. Before review, create the blind-safe
+packet from the capture and give that packet—not Builder reasoning—to the Skeptic:
 
 ```
-python3 scripts/wincreator.py review P-014 \
-  --verdict evidenced --reviewer skeptic-01
+python3 scripts/challenge_packet.py create --attestation <attestation.json> --out packet.json
+python3 scripts/wincreator.py review P-014 --verdict evidenced --reviewer skeptic-01 \
+  --challenge "attempted falsification" --challenge-packet packet.json
 ```
 
 Review may record `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. `INSUFFICIENT`
@@ -307,8 +307,8 @@ gate. Use `--optional-file` for optional inputs. Protect sensitive output with
 only after the process exits. A Standard capture outside Git warns when it has
 no `--file`, because then no source snapshot is bound to the claim. Read
 `references/attestation.md` and validate the machine schema at
-`schemas/attestation-v1.schema.json` and `schemas/review-v1.schema.json` for
-Regulated work.
+`schemas/attestation-v1.schema.json` and the current review schema for
+Regulated work. Historical review v1/v2 records remain verifiable.
 
 ## Intent convergence before final proof
 
