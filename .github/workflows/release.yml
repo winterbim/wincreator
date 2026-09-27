@@ -65,12 +65,17 @@ jobs:
             --file dist/wincreator.skill \
             --file dist/wincreator.skill.sha256 \
             -- python tools/run_release_gate.py
+          ATT="$(find "$RUNNER_TEMP/attestations/V3-07" -name attestation.json -type f | sort | tail -n 1)"
+          python skill/wincreator/scripts/challenge_packet.py create \
+            --attestation "$ATT" \
+            --out "$RUNNER_TEMP/challenge-packet.json"
           python skill/wincreator/scripts/wincreator.py review V3-07 \
             --ledger "$RUNNER_TEMP/release-ledger.md" \
             --attest-dir "$RUNNER_TEMP/attestations" \
             --verdict evidenced \
             --reviewer github-actions-skeptic \
             --challenge "attack whether the captured gate is sufficient for the exact claim" \
+            --challenge-packet "$RUNNER_TEMP/challenge-packet.json" \
             --automatic
           python skill/wincreator/scripts/wincreator.py verify \
             --attest-dir "$RUNNER_TEMP/attestations" \
