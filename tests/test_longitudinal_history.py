@@ -106,8 +106,25 @@ def test_verify_tracks_ledger_evidence_when_overlapping_captures_finish_out_of_s
     attest_dir = tmp_path / ".wincreator" / "attestations"
     _ledger(ledger)
 
-    slow = [sys.executable, "-c", "import time; time.sleep(0.35); print('slow')"]
-    fast = [sys.executable, "-c", "import time; time.sleep(0.05); print('fast')"]
+    started = tmp_path / "slow-started"
+    release = tmp_path / "release-slow"
+    slow = [
+        sys.executable, "-c",
+        (
+            "from pathlib import Path; import time; "
+            "Path('slow-started').write_text('started'); "
+            "deadline=time.monotonic()+5; "
+            "release=Path('release-slow'); "
+            "exec(\"while not release.exists():\\n"
+            "    assert time.monotonic() < deadline, 'release timeout'\\n"
+            "    time.sleep(0.01)\"); "
+            "time.sleep(0.2); print('slow')"
+        ),
+    ]
+    fast = [
+        sys.executable, "-c",
+        "from pathlib import Path; Path('release-slow').write_text('go'); print('fast')",
+    ]
 
     def capture(command):
         return wincreator.run_and_attest(
@@ -117,9 +134,14 @@ def test_verify_tracks_ledger_evidence_when_overlapping_captures_finish_out_of_s
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         slow_future = pool.submit(capture, slow)
-        # Ensure the slow gate has a head start but finishes after the fast gate.
+        # Synchronize on the slow child actually starting. run_and_attest takes
+        # its claim-state snapshot before spawning the child, so this proves the
+        # slow capture owns the older snapshot without relying on scheduler timing.
         import time
-        time.sleep(0.05)
+        deadline = time.monotonic() + 5
+        while not started.exists():
+            assert time.monotonic() < deadline, "slow gate did not start"
+            time.sleep(0.01)
         fast_future = pool.submit(capture, fast)
         fast_future.result()
         try:
