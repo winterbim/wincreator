@@ -348,11 +348,13 @@ def self_test():
         (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         agent = root / "agent.py"
         agent.write_text(
-            "import os,pathlib\n"
+            "import json,os,pathlib\n"
             "w=pathlib.Path(os.environ['WINCREATOR_BENCH_WORKSPACE'])\n"
-            "assert (w/'.agents/skills/wincreator/SKILL.md').exists() == "
-            "(os.environ['WINCREATOR_BENCH_CONDITION']=='on')\n"
-            "(w/'answer.py').write_text('VALUE = 1\\n')\n",
+            "condition=os.environ['WINCREATOR_BENCH_CONDITION']\n"
+            "assert (w/'.agents/skills/wincreator/SKILL.md').exists() == (condition=='on')\n"
+            "(w/'answer.py').write_text('VALUE = 1\\n')\n"
+            "m=pathlib.Path(os.environ['WINCREATOR_BENCH_METRICS_OUT'])\n"
+            "m.write_text(json.dumps({'provider':'mock','condition':condition}))\n",
             encoding="utf-8",
         )
         bundle = run_benchmark(
@@ -367,8 +369,10 @@ def self_test():
         assert off["treatment"]["wincreator_skill_tree_sha256"] is None
         assert on["treatment"]["wincreator_skill_tree_sha256"]
         assert on["treatment"]["wincreator_version"]
-        assert off["agent_metrics"]["status"] == "missing"
-        assert on["agent_metrics"]["status"] == "missing"
+        assert off["agent_metrics"]["status"] == "valid"
+        assert on["agent_metrics"]["status"] == "valid"
+        assert off["agent_metrics"]["payload"]["condition"] == "off"
+        assert on["agent_metrics"]["payload"]["condition"] == "on"
         assert all(not row["isolation"]["grader_copied_into_workspace"] for row in bundle["results"])
         assert render_command(
             ['--config={"model":"x"}', "{condition}"], root, root / "p", "on"
