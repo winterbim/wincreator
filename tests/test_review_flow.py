@@ -4,16 +4,18 @@ import sys
 
 import pytest
 
-from conftest import prove
+from conftest import make_challenge_packet, prove
 
 
 def test_review_evidenced_links_capture_and_updates_ledger(wincreator, ledger, tmp_path):
     attestation, path, _code = prove(wincreator, ledger, tmp_path, builder="builder-01")
 
+    packet = make_challenge_packet(wincreator, attestation, path)
     review, review_path = wincreator.review_attestation(
         str(path),
         verdict="EVIDENCED",
         reviewer="skeptic-01", challenge="test falsification challenge",
+        challenge_packet=str(packet),
         ledger=str(ledger),
     )
 
@@ -61,9 +63,10 @@ def test_regulated_builder_cannot_review_own_capture(wincreator, ledger, tmp_pat
 
 
 def test_insufficient_review_blocks_completion(wincreator, ledger_check, ledger, tmp_path):
-    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     wincreator.review_attestation(
-        str(path), verdict="INSUFFICIENT", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
+        str(path), verdict="INSUFFICIENT", reviewer="skeptic-01", challenge="test falsification challenge", challenge_packet=str(packet), ledger=str(ledger)
     )
     assert wincreator.read_claim(str(ledger), "P1")["status"] == "INSUFFICIENT"
     _checked, problems = wincreator.verify_ledger_references(str(ledger))
@@ -72,7 +75,8 @@ def test_insufficient_review_blocks_completion(wincreator, ledger_check, ledger,
 
 
 def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
-    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     code = wincreator.main([
         "review",
         "P1",
@@ -86,6 +90,8 @@ def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
         "ci-skeptic",
         "--challenge",
         "attack whether the release gate covers the claimed behavior",
+        "--challenge-packet",
+        str(packet),
         "--automatic",
     ])
     review = json.loads((Path(path).parent / "review.json").read_text(encoding="utf-8"))
@@ -129,20 +135,22 @@ def test_standard_builder_cannot_review_own_capture(wincreator, ledger, tmp_path
 
 
 def test_review_is_immutable_once_written(wincreator, ledger, tmp_path):
-    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", challenge_packet=str(packet), ledger=str(ledger)
     )
     with pytest.raises(FileExistsError, match="immutable review"):
         wincreator.review_attestation(
-            str(path), verdict="DISPROVEN", reviewer="skeptic-02", challenge="test falsification challenge", ledger=str(ledger)
+            str(path), verdict="DISPROVEN", reviewer="skeptic-02", challenge="test falsification challenge", challenge_packet=str(packet), ledger=str(ledger)
         )
 
 
 def test_review_schema_rejects_recomputed_unknown_fields(wincreator, ledger, tmp_path):
-    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     _review, review_path = wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", challenge_packet=str(packet), ledger=str(ledger)
     )
     review_path = Path(review_path)
     document = json.loads(review_path.read_text(encoding="utf-8"))
@@ -166,26 +174,64 @@ def test_standard_review_requires_explicit_challenge(wincreator, ledger, tmp_pat
         )
 
 
-def test_review_v2_binds_challenge_and_v1_remains_verifiable(wincreator, ledger, tmp_path):
-    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+def test_review_v3_binds_blind_packet_and_older_reviews_remain_verifiable(wincreator, ledger, tmp_path):
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     challenge = "attempted to falsify the claim by checking the unexercised error path"
     review, review_path = wincreator.review_attestation(
         str(path),
         verdict="EVIDENCED",
         reviewer="skeptic-01",
         challenge=challenge,
+        challenge_packet=str(packet),
         ledger=str(ledger),
     )
-    assert review["schema"] == "wincreator.review/v2"
+    assert review["schema"] == "wincreator.review/v3"
     assert review["payload"]["challenge"] == challenge
+    assert review["payload"]["challenge_packet"]["digest"]
     ok, problems = wincreator.verify_review(review_path, str(path))
     assert ok, problems
 
-    legacy = json.loads(Path(review_path).read_text(encoding="utf-8"))
-    legacy["schema"] = "wincreator.review/v1"
-    legacy["payload"].pop("challenge")
-    legacy["digest"]["value"] = wincreator.canonical_digest(legacy["payload"])
-    legacy_path = tmp_path / "legacy-review.json"
-    legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
-    ok, problems = wincreator.verify_review(str(legacy_path), str(path))
+    v2 = json.loads(Path(review_path).read_text(encoding="utf-8"))
+    v2["schema"] = "wincreator.review/v2"
+    v2["payload"].pop("challenge_packet")
+    v2["digest"]["value"] = wincreator.canonical_digest(v2["payload"])
+    v2_path = tmp_path / "review-v2.json"
+    v2_path.write_text(json.dumps(v2), encoding="utf-8")
+    ok, problems = wincreator.verify_review(str(v2_path), str(path))
     assert ok, problems
+
+    v1 = json.loads(v2_path.read_text(encoding="utf-8"))
+    v1["schema"] = "wincreator.review/v1"
+    v1["payload"].pop("challenge")
+    v1["digest"]["value"] = wincreator.canonical_digest(v1["payload"])
+    v1_path = tmp_path / "review-v1.json"
+    v1_path.write_text(json.dumps(v1), encoding="utf-8")
+    ok, problems = wincreator.verify_review(str(v1_path), str(path))
+    assert ok, problems
+
+
+def test_standard_review_rejects_missing_or_tampered_blind_packet(wincreator, ledger, tmp_path):
+    attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    with pytest.raises(ValueError, match="requires --challenge-packet"):
+        wincreator.review_attestation(
+            str(path),
+            verdict="EVIDENCED",
+            reviewer="skeptic-01",
+            challenge="attack the evidence",
+            ledger=str(ledger),
+        )
+
+    packet = make_challenge_packet(wincreator, attestation, path)
+    document = json.loads(packet.read_text(encoding="utf-8"))
+    document["payload"]["capture"]["status"] = "CAPTURED_FAIL"
+    packet.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="digest mismatch"):
+        wincreator.review_attestation(
+            str(path),
+            verdict="EVIDENCED",
+            reviewer="skeptic-01",
+            challenge="attack the evidence",
+            challenge_packet=str(packet),
+            ledger=str(ledger),
+        )
