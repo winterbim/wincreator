@@ -25,7 +25,7 @@ def test_verify_accepts_historical_failed_attempts_before_latest_evidence(wincre
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
     assert code == 0
-    wincreator.review_attestation(first, "INSUFFICIENT", "skeptic", str(ledger))
+    wincreator.review_attestation(first, "INSUFFICIENT", "skeptic", str(ledger), challenge="test falsification challenge")
 
     gate.write_text("raise SystemExit(1)\n", encoding="utf-8")
     _a2, _second, code = wincreator.run_and_attest(
@@ -40,7 +40,7 @@ def test_verify_accepts_historical_failed_attempts_before_latest_evidence(wincre
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
     assert code == 0
-    wincreator.review_attestation(latest, "EVIDENCED", "skeptic", str(ledger))
+    wincreator.review_attestation(latest, "EVIDENCED", "skeptic", str(ledger), challenge="test falsification challenge")
 
     checked, problems = wincreator.verify_ledger_references(str(ledger))
     assert checked == 3
@@ -58,14 +58,14 @@ def test_verify_still_rejects_tampered_historical_capture(wincreator, tmp_path):
         "P1", [sys.executable, str(gate)], ledger=str(ledger),
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
-    wincreator.review_attestation(first, "INSUFFICIENT", "skeptic", str(ledger))
+    wincreator.review_attestation(first, "INSUFFICIENT", "skeptic", str(ledger), challenge="test falsification challenge")
 
     gate.write_text("print('latest')\n", encoding="utf-8")
     _a2, latest, _code = wincreator.run_and_attest(
         "P1", [sys.executable, str(gate)], ledger=str(ledger),
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
-    wincreator.review_attestation(latest, "EVIDENCED", "skeptic", str(ledger))
+    wincreator.review_attestation(latest, "EVIDENCED", "skeptic", str(ledger), challenge="test falsification challenge")
 
     historical = Path(first)
     document = json.loads(historical.read_text(encoding="utf-8"))
@@ -88,7 +88,7 @@ def test_verify_uses_latest_unreviewed_state_not_older_evidence(wincreator, tmp_
         "P1", [sys.executable, str(gate)], ledger=str(ledger),
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
-    wincreator.review_attestation(first, "EVIDENCED", "skeptic", str(ledger))
+    wincreator.review_attestation(first, "EVIDENCED", "skeptic", str(ledger), challenge="test falsification challenge")
 
     gate.write_text("print('new run')\n", encoding="utf-8")
     wincreator.run_and_attest(
@@ -170,7 +170,7 @@ def test_verify_rejects_manual_rollback_to_older_evidenced_chain(wincreator, tmp
         attest_dir=str(attest_dir), cwd=str(tmp_path), quiet=True, tier="standard"
     )
     assert code == 0
-    wincreator.review_attestation(first, "EVIDENCED", "skeptic", str(ledger))
+    wincreator.review_attestation(first, "EVIDENCED", "skeptic", str(ledger), challenge="test falsification challenge")
     older = wincreator.read_claim(str(ledger), "P1")
 
     gate.write_text("raise SystemExit(1)\n", encoding="utf-8")
