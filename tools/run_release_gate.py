@@ -19,6 +19,7 @@ def main():
     run([PYTHON, "-m", "compileall", "-q", "skill/wincreator/scripts", "tools", "tests"])
     run([PYTHON, "skill/wincreator/scripts/ledger_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/wincreator.py", "--self-test"])
+    run([PYTHON, "skill/wincreator/scripts/distill_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "skill/wincreator"])
     for ledger in (
