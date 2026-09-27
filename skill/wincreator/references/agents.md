@@ -51,6 +51,12 @@ Your job:
    regression: a new dependency, moved duplication, hidden generated code or a
    metric improvement that may have harmed readability/performance. A
    deterministic REVIEW_REQUIRED result cannot be softened by prose.
+5. Inventory the material diff against the claim. Mark each new file,
+   dependency, public interface or substantial branch as required, supporting,
+   or unrequested. Unrequested work needs explicit justification or removal.
+6. If the claim implies strong test adequacy, challenge the oracle itself.
+   Coverage alone is weak evidence; use mutation, property/metamorphic,
+   differential, fuzz or another independent attack when practical.
 
 Verdict, exactly one of:
 - EVIDENCED: <why the evidence suffices, in 2 lines max>
