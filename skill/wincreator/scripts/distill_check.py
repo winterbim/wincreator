@@ -107,6 +107,25 @@ def excluded(rel, policy):
     return any(fnmatch.fnmatch(name, p) or fnmatch.fnmatch(path, p) for p in policy["exclude_globs"])
 
 
+def is_manifest_name(name):
+    return name in MANIFEST_NAMES or fnmatch.fnmatch(name, "requirements*.txt")
+
+
+def ancestor_manifests(root, scopes):
+    seen_dirs = set()
+    for scope in scopes:
+        directory = scope if scope.is_dir() else scope.parent
+        while True:
+            if directory not in seen_dirs:
+                seen_dirs.add(directory)
+                for child in sorted(directory.iterdir()):
+                    if child.is_file() and is_manifest_name(child.name):
+                        yield child
+            if directory == root:
+                break
+            directory = directory.parent
+
+
 def relevant_files(root, scopes, policy, warnings):
     seen = set()
     for scope in scopes:
@@ -130,9 +149,19 @@ def relevant_files(root, scopes, policy, warnings):
                 warnings.append(f"symlink ignored: {rel.as_posix()}")
                 continue
             is_source = path.suffix.lower() in policy["source_extensions"]
-            is_manifest = rel.name in MANIFEST_NAMES or fnmatch.fnmatch(rel.name, "requirements*.txt")
+            is_manifest = is_manifest_name(rel.name)
             if is_source or is_manifest:
                 yield path, rel, is_source, is_manifest
+
+    for path in ancestor_manifests(root, scopes):
+        rel = path.relative_to(root)
+        if excluded(rel, policy) or rel.as_posix() in seen:
+            continue
+        seen.add(rel.as_posix())
+        if path.is_symlink():
+            warnings.append(f"symlink ignored: {rel.as_posix()}")
+            continue
+        yield path, rel, False, True
 
 
 def read_utf8(path, rel, warnings):
@@ -177,11 +206,27 @@ def dependency_names(rel, text):
                 warnings.append(f"could not parse project dependencies: {rel.as_posix()}")
     elif rel.name == "Cargo.toml":
         section = ""
+        families = ("dependencies", "dev-dependencies", "build-dependencies")
+        subtable_dependency = None
         for raw in text.splitlines():
             line = raw.strip()
             if line.startswith("[") and line.endswith("]"):
                 section = line[1:-1]
-            elif section in {"dependencies", "dev-dependencies", "build-dependencies"} and "=" in line and not line.startswith("#"):
+                subtable_dependency = None
+                for family in families:
+                    prefix = family + "."
+                    marker = "." + family + "."
+                    if section.startswith(prefix):
+                        subtable_dependency = section[len(prefix):].split(".", 1)[0].strip("\"'")
+                    elif marker in section:
+                        subtable_dependency = section.rsplit(marker, 1)[1].split(".", 1)[0].strip("\"'")
+                if subtable_dependency:
+                    deps.add("cargo:" + subtable_dependency)
+            elif (
+                any(section == family or section.endswith("." + family) for family in families)
+                and "=" in line
+                and not line.startswith("#")
+            ):
                 deps.add("cargo:" + line.split("=", 1)[0].strip().strip("\"'"))
     elif rel.name == "go.mod":
         block = False
@@ -283,8 +328,12 @@ def verify_snapshot(snapshot):
         raise ValueError("snapshot policy digest mismatch")
 
 
-def compare_snapshot(before, root="."):
+def compare_snapshot(before, root=".", expected_baseline_digest=None):
     verify_snapshot(before)
+    if not expected_baseline_digest:
+        raise ValueError("external baseline digest is required")
+    if before["digest"] != expected_baseline_digest:
+        raise ValueError("external baseline digest mismatch")
     current = build_snapshot(root, before["scopes"], before["policy"])
     delta = {k: current["metrics"][k] - before["metrics"][k] for k in current["metrics"]}
     improved = [k for k in LOWER_IS_BETTER if delta[k] < 0]
@@ -349,7 +398,7 @@ def cmd_snapshot(args):
 def cmd_compare(args):
     try:
         before = json.loads(Path(args.before).read_text(encoding="utf-8"))
-        report, current = compare_snapshot(before, args.root)
+        report, current = compare_snapshot(before, args.root, args.baseline_digest)
         write_json(args.out, report)
         if args.current_out:
             write_json(args.current_out, current)
@@ -386,13 +435,13 @@ def self_test():
         check("snapshot_digest", True)
         (root / "package.json").write_text(json.dumps({"dependencies": {"a": "1"}}))
         (root / "a.py").write_text(block + "\n")
-        report, _ = compare_snapshot(before, root)
+        report, _ = compare_snapshot(before, root, before["digest"])
         check("improvement", report["verdict"] == "IMPROVED")
         check("dependency_removed", report["delta"]["declared_dependencies"] == -1)
         check("duplication_reduced", report["delta"]["duplicate_fingerprints"] < 0)
         simple = build_snapshot(root)
         (root / "b.py").write_text("print('extra')\n")
-        report, _ = compare_snapshot(simple, root)
+        report, _ = compare_snapshot(simple, root, simple["digest"])
         check("regression_review", report["verdict"] == "REVIEW_REQUIRED")
         broken = dict(simple)
         broken["metrics"] = dict(simple["metrics"])
@@ -420,6 +469,7 @@ def build_parser():
     snap.add_argument("--out", required=True)
     comp = sub.add_parser("compare")
     comp.add_argument("--before", required=True)
+    comp.add_argument("--baseline-digest", required=True)
     comp.add_argument("--root", default=".")
     comp.add_argument("--out", required=True)
     comp.add_argument("--current-out")
