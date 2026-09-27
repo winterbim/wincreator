@@ -194,6 +194,44 @@ normal capture with --file. Correctness still comes from the behavior gate;
 the distillation report is maintainability evidence. Full protocol and limits:
 references/code-distillation.md.
 
+## The Distillation Gate (when simplicity is part of the claim)
+
+Correct code can still be needlessly expensive to understand, maintain, and
+feed back into an AI context. When a Meso+ change claims to simplify,
+refactor, reduce duplication, or improve architecture, measure structural cost
+instead of trusting prose.
+
+Use `scripts/distill.py` to capture a before/after vector: source files,
+source bytes, non-blank lines, largest file, large-file count, exact repeated
+line instances, and dependency surface. The result is deliberately **not** a
+weighted quality score.
+
+```
+python3 scripts/distill.py snapshot . --out .wincreator/distill-before.json
+# implement
+python3 scripts/distill.py snapshot . --out .wincreator/distill-after.json
+python3 scripts/distill.py compare .wincreator/distill-before.json \
+  .wincreator/distill-after.json --mode refactor \
+  --out .wincreator/distill-report.json
+```
+
+A distillation `PASS` never proves correctness. A `REVIEW` never means the
+change is automatically wrong. The gate follows VEOR's useful monotonic law:
+structural evidence may **tighten** review, but it may never upgrade failed
+tests, insufficient evidence, or an unproven claim.
+
+For consequential work, bind the report into the ordinary attestation with
+`wincreator prove --file .wincreator/distill-report.json`; do not create a
+parallel proof system. Do not create a fourth "Distiller" agent either: the
+Builder produces the deterministic evidence and the existing Skeptic attacks
+it.
+
+Refactor rule: abstractions must repay their structural cost. New layers,
+files, dependencies, or duplication need an explicit reason. Never delete
+tests, validation, security, error handling, or required observability merely
+to improve the vector. Full contract and limitations:
+`references/distillation.md`.
+
 ## The Proof Ledger (Meso+ tasks)
 
 A plain markdown table (default `PROOF_LEDGER.md`) where every claim carries
@@ -399,4 +437,4 @@ References — read when the situation calls for them:
   metrics and limits
 - `references/agents.md` — Builder/Skeptic/Scout role prompts, delegation
 - `references/gate-checklist-generique.md` — domain-adaptable proof checklist
-- `references/loop-ticket-template.md` — iteration traceability template
+- `references/loop-ticket-template.md` — iteration traceability template\n- `references/distillation.md` — structural-cost snapshots, comparison modes, and limits
