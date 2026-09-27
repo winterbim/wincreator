@@ -138,6 +138,7 @@ jobs:
             --attest-dir "$RUNNER_TEMP/attestations" \
             --verdict evidenced \
             --reviewer github-actions-skeptic \
+            --challenge "attack whether the captured gate is sufficient for the exact claim" \
             --automatic
           python skill/wincreator/scripts/wincreator.py verify \
             --attest-dir "$RUNNER_TEMP/attestations" \
