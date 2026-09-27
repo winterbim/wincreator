@@ -228,7 +228,7 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 
 | Resource | Purpose |
 |---|---|
-| [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |
+| [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |\n| [`skill/wincreator/scripts/distill.py`](skill/wincreator/scripts/distill.py) | structural-cost before/after gate; never a correctness score |
 | [`skill/wincreator/scripts/distill_check.py`](skill/wincreator/scripts/distill_check.py) | structural before/after evidence for code distillation |
 | [`skill/wincreator/references/code-distillation.md`](skill/wincreator/references/code-distillation.md) | distillation doctrine, workflow and limits |
 | [`examples/minimal/`](examples/minimal/) | runnable sandbox |
