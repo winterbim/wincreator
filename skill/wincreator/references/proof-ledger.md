@@ -34,8 +34,7 @@ Three statuses block a loop from reporting done: `CLAIMED`, `DISPROVEN`, and
   evidence requirement as EVIDENCED: a negative result is a result, and it
   is kept. Blocking, because a false claim is not a finished loop.
 - `INSUFFICIENT` — an independent review inspected the capture but found that
-  it does not prove the claim. The Evidence cell must link the review verdict,
-  reviewer, and timestamp. This blocks completion until better evidence is
+  it does not prove the claim. The Evidence cell must link the review verdict, reviewer, and timestamp. New review/v2 artifacts also bind the concrete adversarial `challenge` that the reviewer attempted; inspect the review JSON when that rationale matters. This blocks completion until better evidence is
   captured and reviewed.
 - `PENDING` — the proof is defined but cannot be executed in the current
   context (no execution tool; runs on the developer's machine). The Evidence
