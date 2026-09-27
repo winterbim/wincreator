@@ -36,7 +36,11 @@ def _tool_version():
 
 VERSION = _tool_version()
 ATTESTATION_SCHEMA = "wincreator.attestation/v1"
-REVIEW_SCHEMA = "wincreator.review/v1"
+REVIEW_SCHEMA = "wincreator.review/v2"
+REVIEW_SCHEMA_FILES = {
+    "wincreator.review/v1": "review-v1.schema.json",
+    "wincreator.review/v2": "review-v2.schema.json",
+}
 DEFAULT_ATTEST_DIR = ".wincreator/attestations"
 DEFAULT_LEDGER = "PROOF_LEDGER.md"
 SIGNING_KEY_ENV = "WINCREATOR_SIGNING_KEY"
@@ -390,7 +394,7 @@ def _require(mapping, keys, label):
 
 
 _ATTESTATION_SCHEMA_CACHE = None
-_REVIEW_SCHEMA_CACHE = None
+_REVIEW_SCHEMA_CACHE = {}
 
 
 def _schema_type_matches(value, expected):
@@ -477,15 +481,15 @@ def validate_attestation_document(document):
 
 
 def validate_review_document(document):
-    global _REVIEW_SCHEMA_CACHE
-    if _REVIEW_SCHEMA_CACHE is None:
-        schema_path = Path(__file__).resolve().parents[1] / "schemas" / "review-v1.schema.json"
-        _REVIEW_SCHEMA_CACHE = json.loads(schema_path.read_text(encoding="utf-8"))
-    _validate_json_schema(
-        document,
-        _REVIEW_SCHEMA_CACHE,
-        _REVIEW_SCHEMA_CACHE,
-    )
+    schema_name = document.get("schema") if isinstance(document, dict) else None
+    schema_file = REVIEW_SCHEMA_FILES.get(schema_name)
+    if not schema_file:
+        raise ValueError(f"unsupported review schema: {schema_name!r}")
+    if schema_name not in _REVIEW_SCHEMA_CACHE:
+        schema_path = Path(__file__).resolve().parents[1] / "schemas" / schema_file
+        _REVIEW_SCHEMA_CACHE[schema_name] = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema = _REVIEW_SCHEMA_CACHE[schema_name]
+    _validate_json_schema(document, schema, schema)
     return True
 
 
@@ -870,6 +874,7 @@ def review_attestation(
     ledger=None,
     automatic=False,
     expected_claim_id=None,
+    challenge=None,
 ):
     verdict = verdict.upper()
     reviewer = str(reviewer).strip()
@@ -898,6 +903,18 @@ def review_attestation(
     tier = payload["policy"]["tier"]
     if tier in {"standard", "regulated"} and reviewer == payload["builder"]:
         raise ValueError(f"{tier.title()} builder and reviewer must differ")
+    challenge = str(challenge or "").strip()
+    if not challenge:
+        if tier == "lite" and automatic:
+            challenge = (
+                "Lite automatic review: the direct gate passed; "
+                "this tier does not require an independent adversarial challenge."
+            )
+        else:
+            raise ValueError(
+                "review challenge must be non-empty; name the concrete falsification "
+                "attempt, evidence gap, or counterexample checked"
+            )
     review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
     if os.path.exists(review_path):
         raise FileExistsError(
@@ -930,6 +947,7 @@ def review_attestation(
         "capture_status": capture_status,
         "verdict": verdict,
         "reviewer": reviewer,
+        "challenge": challenge,
         "reviewed_at": reviewed_at,
         "automatic": bool(automatic),
     }
@@ -1276,6 +1294,7 @@ def cmd_review(args):
             ledger=None if args.no_ledger else args.ledger,
             automatic=args.automatic,
             expected_claim_id=args.claim_id,
+            challenge=args.challenge,
         )
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
@@ -1407,6 +1426,10 @@ def build_parser():
     review.add_argument("claim_id")
     review.add_argument("--verdict", required=True, choices=("evidenced", "insufficient", "disproven"))
     review.add_argument("--reviewer", required=True)
+    review.add_argument(
+        "--challenge",
+        help="concrete falsification attempt, evidence gap, or counterexample checked",
+    )
     review.add_argument("--attestation")
     review.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
     review.add_argument("--ledger", default=DEFAULT_LEDGER)
