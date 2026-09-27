@@ -12,6 +12,8 @@ history remains available in Git and is not restated here.
 ## [Unreleased]
 
 ### Added
+- Public GitHub/Sigstore build-provenance attestations for release packages, independently verifiable with `gh attestation verify`.
+- RED-lock guidance for pre-implementation acceptance tests, intent-convergence review for unrequested work, and stronger negative-space proof guidance (mutation/property/differential/fuzz where appropriate).
 - Structural Distillation Gate: stdlib-only `scripts/distill_check.py` captures
   deterministic before/after snapshots, policy digests, direct-dependency
   changes, duplicate fingerprints and monotonic `REVIEW_REQUIRED` verdicts.
