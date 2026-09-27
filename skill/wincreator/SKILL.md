@@ -229,6 +229,23 @@ means the wait is well-formed, not that the object is still blocked.
 Documentary claims (counts, versions, paths, surfaces) obey the same law:
 re-derive them from the object at read time.
 
+## RED lock for new behavior (Standard/Regulated)
+
+When a new behavior can be expressed as a deterministic acceptance test before
+implementation, freeze that test **before** writing the feature. Run the expected
+failing gate through `wincreator prove` and bind the acceptance-test file with
+`--file`. That failed capture is useful evidence: it proves the test actually
+distinguished "before" from "after", and historical verification will later
+reject the proof chain if the frozen test file was silently weakened or rewritten.
+
+After implementation, rerun the same gate with the same acceptance-test file.
+If the original test was genuinely wrong, do not edit history to make it fit the
+code: supersede/reformulate the claim and create a fresh evidence chain.
+
+This is not mandatory for every refactor or bugfix. It is the preferred pattern
+for consequential new behavior because it separates the oracle from the code
+that later satisfies it.
+
 ## Capture first, review second
 
 A hand-written Evidence cell is still a story about a proof. Execute the gate
@@ -269,6 +286,24 @@ no `--file`, because then no source snapshot is bound to the claim. Read
 `references/attestation.md` and validate the machine schema at
 `schemas/attestation-v1.schema.json` and `schemas/review-v1.schema.json` for
 Regulated work.
+
+## Intent convergence before final proof
+
+For code-producing Meso+ work, the final Skeptic pass must compare the observed
+change surface against the original claim and fixed constraints, not only ask
+whether tests are green. Inspect the diff, new files, dependencies and public
+interfaces and classify each material addition as:
+
+- **required** — directly necessary for the claim;
+- **supporting** — necessary infrastructure for a required behavior;
+- **unrequested** — not justified by the claim or constraints.
+
+An unrequested addition is not automatically bad, but it cannot disappear into
+"while I was here" work. Remove it or make its justification explicit; otherwise
+the evidence is INSUFFICIENT for a minimal/scope-faithful completion claim. This
+is the anti-scope-creep complement to the Distillation Gate: structural metrics
+show *how much* changed; intent convergence asks *why each material change
+exists*.
 
 ## Builder/Skeptic separation (defense against optimism leak)
 
