@@ -16,6 +16,9 @@ jobs:
       contents: read
       checks: read
       actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +83,13 @@ jobs:
           cp dist/wincreator.skill.sha256 "$RUNNER_TEMP/release-bundle/dist/wincreator.skill.sha256"
           (cd "$RUNNER_TEMP/release-bundle" && zip -qr "$GITHUB_WORKSPACE/dist/wincreator-attestations.zip" attestations release-ledger.md dist)
           (cd dist && sha256sum wincreator-attestations.zip > wincreator-attestations.zip.sha256)
+      - name: Publish cryptographic build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/skill.zip
+            dist/wincreator.skill
+            dist/wincreator-attestations.zip
       - uses: actions/upload-artifact@v4
         with:
           name: wincreator-release-bundle-${{ github.sha }}
