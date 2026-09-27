@@ -120,6 +120,27 @@ def run_process(command, cwd, timeout, env=None):
     }
 
 
+
+def load_agent_metrics(path):
+    path = Path(path)
+    if not path.exists():
+        return {"status": "missing"}
+    try:
+        raw = path.read_bytes()
+        if len(raw) > 1024 * 1024:
+            raise ValueError("agent metrics exceed 1 MiB")
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("agent metrics must be a JSON object")
+        return {
+            "status": "valid",
+            "sha256": sha256_bytes(raw),
+            "payload": payload,
+        }
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        return {"status": "invalid", "error": str(exc)}
+
+
 def load_manifest(path):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if data.get("schema") != "wincreator.ablation-manifest/v1":
@@ -197,14 +218,17 @@ def run_case(case, manifest_dir, condition, repetition, agent_template, output_r
     workspace, prompt, treatment = prepare_workspace(case, manifest_dir, condition, run_root)
     before_digest = tree_digest(workspace)
     command = render_command(agent_template, workspace, prompt, condition)
+    metrics_path = run_root / "agent-metrics.json"
     env = os.environ.copy()
     env.update({
         "WINCREATOR_BENCH_WORKSPACE": str(workspace),
         "WINCREATOR_BENCH_PROMPT": str(prompt),
         "WINCREATOR_BENCH_CONDITION": condition,
         "WINCREATOR_BENCH_CASE": case["id"],
+        "WINCREATOR_BENCH_METRICS_OUT": str(metrics_path),
     })
     agent = run_process(command, workspace, int(case["timeout_seconds"]), env)
+    agent_metrics = load_agent_metrics(metrics_path)
     grader_path = (manifest_dir / case["grader"]).resolve()
     grader = run_process(
         [sys.executable, str(grader_path), str(workspace)],
@@ -225,6 +249,7 @@ def run_case(case, manifest_dir, condition, repetition, agent_template, output_r
         "workspace_after_sha256": tree_digest(workspace),
         "agent_command": command,
         "agent": agent,
+        "agent_metrics": agent_metrics,
         "grader": grader,
         "passed": grader["status"] == "completed" and grader["exit_code"] == 0,
         "structure": structure(workspace),
@@ -342,6 +367,8 @@ def self_test():
         assert off["treatment"]["wincreator_skill_tree_sha256"] is None
         assert on["treatment"]["wincreator_skill_tree_sha256"]
         assert on["treatment"]["wincreator_version"]
+        assert off["agent_metrics"]["status"] == "missing"
+        assert on["agent_metrics"]["status"] == "missing"
         assert all(not row["isolation"]["grader_copied_into_workspace"] for row in bundle["results"])
         assert render_command(
             ['--config={"model":"x"}', "{condition}"], root, root / "p", "on"
