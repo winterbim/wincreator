@@ -7,7 +7,6 @@ It deliberately does not produce a universal quality score or claim optimality.
 from __future__ import annotations
 
 import argparse
-import ast
 import fnmatch
 import hashlib
 import json
@@ -177,74 +176,31 @@ def read_utf8(path, rel, warnings):
 
 
 def dependency_names(rel, text):
+    """Return only dependencies we can parse without heuristic manifest grammars.
+
+    JSON and requirements files have a small, stable parsing surface here.
+    TOML/go.mod manifests are fingerprinted instead; changing one forces review
+    rather than risking a false-clean result from a partial parser.
+    """
     deps, warnings = set(), []
     if rel.name == "package.json":
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            return deps, [f"invalid package.json: {rel.as_posix()}"]
+            return deps, [f"invalid package.json: {rel.as_posix()}"], True
         for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
             if isinstance(data.get(section), dict):
                 deps.update(f"npm:{name}" for name in data[section])
-    elif fnmatch.fnmatch(rel.name, "requirements*.txt"):
+        return deps, warnings, True
+    if fnmatch.fnmatch(rel.name, "requirements*.txt"):
         for raw in text.splitlines():
             line = raw.split("#", 1)[0].strip()
             if line and not line.startswith(("-r", "--requirement", "-c", "--constraint")):
                 name = re.split(r"[<>=!~;\s\[]", line, 1)[0]
                 if name:
                     deps.add(f"python:{name.lower()}")
-    elif rel.name == "pyproject.toml":
-        match = re.search(r"(?ms)^dependencies\s*=\s*(\[.*?\])", text)
-        if match:
-            try:
-                items = ast.literal_eval(match.group(1))
-                for item in items if isinstance(items, list) else []:
-                    name = re.split(r"[<>=!~;\s\[]", str(item), 1)[0]
-                    if name:
-                        deps.add(f"python:{name.lower()}")
-            except (SyntaxError, ValueError):
-                warnings.append(f"could not parse project dependencies: {rel.as_posix()}")
-    elif rel.name == "Cargo.toml":
-        section = ""
-        families = ("dependencies", "dev-dependencies", "build-dependencies")
-        subtable_dependency = None
-        for raw in text.splitlines():
-            line = raw.strip()
-            if line.startswith("[") and line.endswith("]"):
-                section = line[1:-1]
-                subtable_dependency = None
-                for family in families:
-                    prefix = family + "."
-                    marker = "." + family + "."
-                    if section.startswith(prefix):
-                        subtable_dependency = section[len(prefix):].split(".", 1)[0].strip("\"'")
-                    elif marker in section:
-                        subtable_dependency = section.rsplit(marker, 1)[1].split(".", 1)[0].strip("\"'")
-                if subtable_dependency:
-                    deps.add("cargo:" + subtable_dependency)
-            elif (
-                any(section == family or section.endswith("." + family) for family in families)
-                and "=" in line
-                and not line.startswith("#")
-            ):
-                deps.add("cargo:" + line.split("=", 1)[0].strip().strip("\"'"))
-    elif rel.name == "go.mod":
-        block = False
-        for raw in text.splitlines():
-            line = raw.strip()
-            if line == "require (":
-                block = True
-                continue
-            if block and line == ")":
-                block = False
-                continue
-            if line.startswith("require "):
-                line = line[8:].strip()
-            elif not block:
-                continue
-            if line and not line.startswith("//"):
-                deps.add("go:" + line.split()[0])
-    return deps, warnings
+        return deps, warnings, True
+    return deps, warnings, False
 
 
 def logical_lines(text):
@@ -263,16 +219,22 @@ def build_snapshot(root=".", scopes=None, policy=None):
     policy = normalize_policy(policy)
     root, scopes = resolve_scopes(root, scopes)
     warnings, files, deps, manifests = [], [], set(), []
+    manifest_files = []
     duplicate_hits = defaultdict(list)
     for path, rel, is_source, is_manifest in relevant_files(root, scopes, policy, warnings):
         text, raw = read_utf8(path, rel, warnings)
         if text is None:
             continue
         if is_manifest:
-            found, issues = dependency_names(rel, text)
+            found, issues, dependency_parsed = dependency_names(rel, text)
             deps.update(found)
             warnings.extend(issues)
             manifests.append(rel.as_posix())
+            manifest_files.append({
+                "path": rel.as_posix(),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "dependency_parsed": dependency_parsed,
+            })
         if not is_source:
             continue
         lines = text.splitlines()
@@ -310,6 +272,7 @@ def build_snapshot(root=".", scopes=None, policy=None):
         "files": files,
         "dependencies": sorted(deps),
         "manifests": sorted(set(manifests)),
+        "manifest_files": sorted(manifest_files, key=lambda x: x["path"]),
         "duplicates": duplicates,
         "warnings": sorted(set(warnings)),
     }
@@ -344,6 +307,18 @@ def compare_snapshot(before, root=".", expected_baseline_digest=None):
         regressed = sorted(set(regressed + ["new_dependencies"]))
     if current["warnings"]:
         regressed = sorted(set(regressed + ["scan_warnings"]))
+    before_manifests = {x["path"]: x for x in before.get("manifest_files", [])}
+    after_manifests = {x["path"]: x for x in current.get("manifest_files", [])}
+    unparsed_manifest_changes = []
+    for path in sorted(set(before_manifests) | set(after_manifests)):
+        old = before_manifests.get(path)
+        new = after_manifests.get(path)
+        changed = old is None or new is None or old["sha256"] != new["sha256"]
+        parsed = (old or new).get("dependency_parsed", False)
+        if changed and not parsed:
+            unparsed_manifest_changes.append(path)
+    if unparsed_manifest_changes:
+        regressed = sorted(set(regressed + ["unparsed_manifest_changes"]))
     before_files = {x["path"]: x["sha256"] for x in before["files"]}
     after_files = {x["path"]: x["sha256"] for x in current["files"]}
     verdict = "REVIEW_REQUIRED" if regressed else ("IMPROVED" if improved else "UNCHANGED")
@@ -365,6 +340,7 @@ def compare_snapshot(before, root=".", expected_baseline_digest=None):
         "dependency_changes": {
             "added": added_deps,
             "removed": sorted(before_deps - after_deps),
+            "unparsed_manifest_changes": unparsed_manifest_changes,
         },
         "warnings": current["warnings"],
         "verdict": verdict,
