@@ -124,10 +124,12 @@ source_extensions, exclude_dirs, exclude_globs, duplicate_window_lines and
 duplicate_min_chars. Unknown policy keys are rejected.
 
 The default scanner extracts dependency names only from formats it can parse
-without a partial grammar: npm `package.json` and common
-`requirements*.txt` files. `pyproject.toml`, `Cargo.toml` and `go.mod`
-are still discovered and content-fingerprinted, but WinCreator deliberately
-does not maintain home-grown TOML or Go-module parsers. If one of those
+without a partial grammar: npm `package.json` and **simple direct**
+`requirements*.txt` entries. Requirements directives or path/URL/editable
+entries make that manifest opaque and force REVIEW_REQUIRED through a scan
+warning. `pyproject.toml`, `Cargo.toml` and `go.mod` are discovered and
+content-fingerprinted, but WinCreator deliberately does not maintain home-grown
+TOML or Go-module parsers. If one of those
 unparsed manifests is added, removed, or changes after the baseline, the result
 is `REVIEW_REQUIRED` rather than a guessed dependency delta. This is
 fail-closed and intentionally trades precision for avoiding false-clean results.
@@ -172,3 +174,8 @@ The design borrows one useful boundary from VEOR: deterministic evidence may
 force more review, while probabilistic judgment may never silently weaken a
 deterministic warning. The snapshot policy digest also follows the same idea as
 binding an execution receipt to the policy that governed it.
+
+
+Directory symlinks beneath a scanned scope are never traversed and are reported
+as scan warnings. This avoids silently importing a large source tree through an
+alias while preserving fail-closed behavior.
