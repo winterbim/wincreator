@@ -246,15 +246,28 @@ passes, the verdict is `INSUFFICIENT`. This is deliberately narrower than a
 full mutation-testing framework; use a mature ecosystem mutator when one is
 already available and bind its report as WinCreator evidence.
 
+## Public ON/OFF benchmark
+
+WinCreator now carries a paired ablation harness under [`bench/`](bench/README.md).
+It is designed to answer the question that feature lists cannot: does the same
+coding agent, on the same frozen task and budget, produce better verified
+outcomes with WinCreator ON than OFF?
+
+The initial cases are benchmark-infrastructure smoke tests, not evidence for a
+global superiority claim. Publication-grade runs require repeated agent
+executions and stronger oracle isolation than the default local workspace mode.
+
 ## Development gates
 
 ```bash
-python3 -m compileall -q skill/wincreator/scripts tools tests
+python3 -m compileall -q skill/wincreator/scripts tools tests bench
 python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
 python3 skill/wincreator/scripts/distill_check.py --self-test
 python3 skill/wincreator/scripts/adequacy_check.py self-test
 python3 skill/wincreator/scripts/challenge_packet.py self-test
+python3 bench/run_ablation.py --self-test
+python3 bench/validate_cases.py
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
