@@ -30,7 +30,7 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check pytest==8.3.5 jsonschema==4.23.0
       - name: Compile shipped Python
-        run: python -m compileall -q skill/wincreator/scripts tools tests
+        run: python -m compileall -q skill/wincreator/scripts tools tests bench
       - name: Run embedded adversarial suites
         run: |
           python skill/wincreator/scripts/ledger_check.py --self-test
@@ -38,6 +38,8 @@ jobs:
           python skill/wincreator/scripts/distill_check.py --self-test
           python skill/wincreator/scripts/adequacy_check.py self-test
           python skill/wincreator/scripts/challenge_packet.py self-test
+          python bench/run_ablation.py --self-test
+          python bench/validate_cases.py
           python skill/wincreator/scripts/package_check.py --self-test
       - name: Run external adversarial suite
         run: python -m pytest -q
