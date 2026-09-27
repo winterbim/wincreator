@@ -61,11 +61,16 @@ Say:
 Use the generated claim ID from the previous command:
 
 ```bash
+python3 "$WC/scripts/challenge_packet.py" create \
+  --attestation <attestation.json> \
+  --out .wincreator/challenge-packet.json
+
 python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
   --ledger .wincreator/PROOF_LEDGER.md \
   --verdict insufficient \
-  --reviewer demo-skeptic
+  --reviewer demo-skeptic \
   --challenge "attack whether the captured gate is sufficient for the exact claim" \
+  --challenge-packet .wincreator/challenge-packet.json
 ```
 
 Say:
