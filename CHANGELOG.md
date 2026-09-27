@@ -11,8 +11,12 @@ history remains available in Git and is not restated here.
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-09-27
+
 ### Added
 - Public GitHub/Sigstore build-provenance attestations for release packages, independently verifiable with `gh attestation verify`.
+- Challenge-bound adversarial review: current reviews record a concrete attack against the claim/evidence before an epistemic verdict can be accepted, while historical review records remain verifiable.
+- Reproducible ChatGPT self-ablation experiment in CI: an initially green implementation is attacked with hidden/adversarial cases, mutation adequacy, distillation, and cross-platform replay.
 - RED-lock guidance for pre-implementation acceptance tests, intent-convergence review for unrequested work, and stronger negative-space proof guidance (mutation/property/differential/fuzz where appropriate).
 - Structural Distillation Gate: stdlib-only `scripts/distill_check.py` captures
   deterministic before/after snapshots, policy digests, direct-dependency
