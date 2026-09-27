@@ -1,0 +1,9 @@
+{
+  "schema": "wincreator.ablation-manifest/v1",
+  "cases": [
+    {"id":"001-boundary","task":"cases/001-boundary/task.md","seed":"cases/001-boundary/seed","grader":"cases/001-boundary/grader.py","timeout_seconds":600},
+    {"id":"002-escaped-table","task":"cases/002-escaped-table/task.md","seed":"cases/002-escaped-table/seed","grader":"cases/002-escaped-table/grader.py","timeout_seconds":600},
+    {"id":"003-stable-unique","task":"cases/003-stable-unique/task.md","seed":"cases/003-stable-unique/seed","grader":"cases/003-stable-unique/grader.py","timeout_seconds":600},
+    {"id":"004-config-precedence","task":"cases/004-config-precedence/task.md","seed":"cases/004-config-precedence/seed","grader":"cases/004-config-precedence/grader.py","timeout_seconds":600}
+  ]
+}
