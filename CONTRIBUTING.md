@@ -27,7 +27,8 @@ capturing it rather than writing it:
 python3 skill/wincreator/scripts/wincreator.py prove P-XX \
   --tier standard --builder your-id -- <your command>
 python3 skill/wincreator/scripts/wincreator.py review P-XX \
-  --verdict evidenced --reviewer skeptic-id
+  --verdict evidenced --reviewer skeptic-id \
+  --challenge "attack whether the captured gate is sufficient for the exact claim"
 ```
 
 For Standard/Regulated code-producing Meso+ changes, also attach the
