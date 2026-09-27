@@ -25,7 +25,10 @@ def validate(manifest_path):
     problems = []
     seen = set()
     receipts = []
-    for case in data.get("cases", []):
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("benchmark manifest requires at least one case")
+    for case in cases:
         case_id = case.get("id")
         if not case_id or case_id in seen:
             problems.append(f"invalid or duplicate case id: {case_id!r}")
