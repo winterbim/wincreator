@@ -68,14 +68,19 @@ python3 "$WC/scripts/quick_prove.py" \
 
 A green command becomes `PENDING`, not `EVIDENCED`.
 
-The capture prints the generated claim ID. A separate reviewer, with an identifier different from the Builder, then evaluates whether the captured gate really proves the claim:
+The capture prints the generated claim ID and capture path. Build a blind-safe packet, then give the Skeptic that packet instead of the Builder's reasoning:
 
 ```bash
+python3 "$WC/scripts/challenge_packet.py" create \
+  --attestation <attestation.json> \
+  --out .wincreator/challenge-packet.json
+
 python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
   --ledger .wincreator/PROOF_LEDGER.md \
   --verdict evidenced \
-  --reviewer skeptic-01
+  --reviewer skeptic-01 \
   --challenge "attack whether the captured gate is sufficient for the exact claim" \
+  --challenge-packet .wincreator/challenge-packet.json
 ```
 
 The reviewer may instead record `INSUFFICIENT` or `DISPROVEN`.
