@@ -84,6 +84,8 @@ def test_cli_marks_automated_review_explicitly(wincreator, ledger, tmp_path):
         "evidenced",
         "--reviewer",
         "ci-skeptic",
+        "--challenge",
+        "attack whether the release gate covers the claimed behavior",
         "--automatic",
     ])
     review = json.loads((Path(path).parent / "review.json").read_text(encoding="utf-8"))
@@ -151,3 +153,39 @@ def test_review_schema_rejects_recomputed_unknown_fields(wincreator, ledger, tmp
     ok, problems = wincreator.verify_review(str(review_path), str(path))
     assert not ok
     assert any("schema-invalid" in problem for problem in problems)
+
+
+def test_standard_review_requires_explicit_challenge(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    with pytest.raises(ValueError, match="review challenge must be non-empty"):
+        wincreator.review_attestation(
+            str(path),
+            verdict="EVIDENCED",
+            reviewer="skeptic-01",
+            ledger=str(ledger),
+        )
+
+
+def test_review_v2_binds_challenge_and_v1_remains_verifiable(wincreator, ledger, tmp_path):
+    _attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    challenge = "attempted to falsify the claim by checking the unexercised error path"
+    review, review_path = wincreator.review_attestation(
+        str(path),
+        verdict="EVIDENCED",
+        reviewer="skeptic-01",
+        challenge=challenge,
+        ledger=str(ledger),
+    )
+    assert review["schema"] == "wincreator.review/v2"
+    assert review["payload"]["challenge"] == challenge
+    ok, problems = wincreator.verify_review(review_path, str(path))
+    assert ok, problems
+
+    legacy = json.loads(Path(review_path).read_text(encoding="utf-8"))
+    legacy["schema"] = "wincreator.review/v1"
+    legacy["payload"].pop("challenge")
+    legacy["digest"]["value"] = wincreator.canonical_digest(legacy["payload"])
+    legacy_path = tmp_path / "legacy-review.json"
+    legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
+    ok, problems = wincreator.verify_review(str(legacy_path), str(path))
+    assert ok, problems
