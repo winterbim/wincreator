@@ -7,49 +7,92 @@
       "repository": "https://github.com/winterbim/wincreator",
       "revision": "d5dcbaef9d1de5799e215720eece693965d70d08",
       "role": "claim-bound proof and engineering-discipline layer",
-      "evidence": ["README.md", "skill/wincreator/SKILL.md", ".github/workflows/ci.yml"]
+      "evidence": [
+        "README.md",
+        "skill/wincreator/SKILL.md",
+        ".github/workflows/ci.yml"
+      ]
     },
     {
       "id": "mini-swe-agent",
       "repository": "https://github.com/SWE-agent/mini-swe-agent",
       "revision": "04d809ceab9df28f9adaed044884180159172930",
       "role": "minimal high-performing coding agent and sandbox/evaluation harness",
-      "evidence": ["README.md", "docs/"]
+      "evidence": [
+        "README.md",
+        "docs/"
+      ]
     },
     {
       "id": "prove-it",
       "repository": "https://github.com/Pablo-aps/prove-it",
       "revision": "4c5a6426a620019239b094f8cd0721ee25af59d4",
       "role": "portable adversarial verification skill with baseline/treatment benchmark",
-      "evidence": ["README.md", "benchmark/"]
+      "evidence": [
+        "README.md",
+        "benchmark/"
+      ]
     },
     {
       "id": "forge",
       "repository": "https://github.com/daanavcoding/forge",
       "revision": "1311474acc99d8152176b53baab59b1394927452",
       "role": "repeatable coding-agent workflow with blind judging and cost benchmark",
-      "evidence": ["README.md", "bench/", "docs/current-contract.md"]
+      "evidence": [
+        "README.md",
+        "bench/",
+        "docs/current-contract.md"
+      ]
     },
     {
       "id": "eforge",
       "repository": "https://github.com/eforge-build/eforge",
       "revision": "499776fb979b8166258cdf9bb95b41de703de835",
       "role": "agentic build system with worktree isolation, blind review and acceptance validation",
-      "evidence": ["README.md", "docs/architecture.md"]
+      "evidence": [
+        "README.md",
+        "docs/architecture.md"
+      ]
     },
     {
       "id": "openfab",
       "repository": "https://github.com/Open-fab-ai/openfab",
       "revision": "17b964ee24b2cb7b751aebf9ed51524a5a9e1bd8",
       "role": "trusted software fab with signed provenance, acceptance, SBOM and human sign-off",
-      "evidence": ["README.md", "docs/OpenFab_Overview.md"]
+      "evidence": [
+        "README.md",
+        "docs/OpenFab_Overview.md"
+      ]
     },
     {
       "id": "meaning-assurance",
       "repository": "https://github.com/leviuszen/meaning-assurance",
       "revision": "ed933c37b5c0135291a15deb6bb968a4cd57fa63",
       "role": "frozen-evidence review/moderation protocol with human final authority",
-      "evidence": ["README.md"]
+      "evidence": [
+        "README.md"
+      ]
+    },
+    {
+      "id": "proofagent-harness",
+      "repository": "https://github.com/ProofAgent-ai/proofagent-harness",
+      "revision": "ce6f821cebefa6330c9f1f3f1817713740b5f40d",
+      "role": "adversarial agent evaluation, coding-agent observability and governance release gates",
+      "evidence": [
+        "README.md",
+        "docs/",
+        "examples/"
+      ]
+    },
+    {
+      "id": "x07",
+      "repository": "https://github.com/x07lang/x07",
+      "revision": "aba71f21a7528db129318e7556a3dca9061ee0c6",
+      "role": "agentic programming language with formal verification, replayable proof objects and certification",
+      "evidence": [
+        "README.md",
+        "docs/toolchain/formal-verification.md"
+      ]
     }
   ],
   "dimensions": [
