@@ -39,6 +39,8 @@ jobs:
           python skill/wincreator/scripts/package_check.py --self-test
       - name: Run external adversarial suite
         run: python -m pytest -q
+      - name: Run ChatGPT self-ablation experiment
+        run: python experiments/self-ablation-001/run_experiment.py
       - name: Check package policy
         run: python skill/wincreator/scripts/package_check.py skill/wincreator
       - name: Check historical ledgers
