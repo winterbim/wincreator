@@ -107,15 +107,40 @@ If you cannot name why the task needs Standard, use Lite.
 
 ## Full protocol
 
-The installable skill adds three defenses to longer agent sessions:
+The installable skill adds four defenses to longer agent sessions:
 
 - **Optimism leak** → Proof Ledger + Builder/Skeptic separation
 - **Context rot** → Loop Panel
 - **Stuck loops** → Two-Failure Rule
+- **Complexity creep** → measured Distillation Gate
 
 Read [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) for the complete protocol.
 
 For a real session where a Skeptic caught a missing error path after green tests, see [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md).
+
+## Code distillation
+
+For consequential code changes, WinCreator can now preserve a working candidate,
+measure its structural cost, and compare a behavior-preserving simplification
+without pretending that code quality is one magic score:
+
+~~~bash
+python3 "$WC/scripts/distill_check.py" snapshot \
+  --root . --scope src \
+  --out .wincreator/distill-before.json
+
+# simplify the already-working implementation
+
+python3 "$WC/scripts/distill_check.py" compare \
+  --before .wincreator/distill-before.json \
+  --root . \
+  --out .wincreator/distill-report.json
+~~~
+
+Any new direct dependency, measured structural regression, or scan warning
+becomes **REVIEW_REQUIRED**. The final functional proof is still run through
+WinCreator and can bind both JSON artifacts with `--file`. See
+[`references/code-distillation.md`](skill/wincreator/references/code-distillation.md).
 
 ## Manual capture API
 
@@ -189,6 +214,7 @@ Release assets: [latest release](https://github.com/winterbim/wincreator/release
 python3 -m compileall -q skill/wincreator/scripts tools tests
 python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
+python3 skill/wincreator/scripts/distill_check.py --self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
@@ -203,6 +229,8 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 | Resource | Purpose |
 |---|---|
 | [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |
+| [`skill/wincreator/scripts/distill_check.py`](skill/wincreator/scripts/distill_check.py) | structural before/after evidence for code distillation |
+| [`skill/wincreator/references/code-distillation.md`](skill/wincreator/references/code-distillation.md) | distillation doctrine, workflow and limits |
 | [`examples/minimal/`](examples/minimal/) | runnable sandbox |
 | [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | real Skeptic catch |
 | [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | full protocol |
