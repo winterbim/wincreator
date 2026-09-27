@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -103,3 +104,42 @@ def prove(wincreator, ledger, tmp_path, command=None, **kwargs):
         tier=kwargs.pop("tier", "standard"),
         **kwargs,
     )
+
+
+def make_challenge_packet(wincreator, attestation, attestation_path):
+    payload = attestation["payload"]
+    packet_payload = {
+        "attestation_digest": attestation["digest"]["value"],
+        "claim": payload["claim"],
+        "capture": payload["capture"],
+        "command": payload["command"],
+        "stdout": {
+            key: payload["stdout"].get(key)
+            for key in ("sha256", "original_bytes", "stored_bytes", "truncated", "body_stored", "tail")
+        },
+        "stderr": {
+            key: payload["stderr"].get(key)
+            for key in ("sha256", "original_bytes", "stored_bytes", "truncated", "body_stored", "tail")
+        },
+        "files": payload.get("files", []),
+        "git": {
+            key: payload.get("git", {}).get(key)
+            for key in (
+                "available", "commit", "tree", "branch", "dirty",
+                "submodules", "untracked_digest", "worktree_digest",
+            )
+            if key in payload.get("git", {})
+        },
+        "policy": {
+            "tier": payload.get("policy", {}).get("tier"),
+            "private": payload.get("policy", {}).get("private"),
+        },
+    }
+    packet = {
+        "schema": "wincreator.challenge-packet/v1",
+        "payload": packet_payload,
+        "digest": wincreator.canonical_digest(packet_payload),
+    }
+    path = Path(attestation_path).parent / "challenge-input.json"
+    path.write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
+    return path
