@@ -162,7 +162,8 @@ then prove the behavior again.
 The mechanical helper keeps a vector rather than a fake quality score:
 source-file count, nonblank lines, recognized direct dependencies, exact
 duplicate fingerprints and largest-file size. It also binds the scan policy by
-digest.
+digest. The baseline digest must be retained outside the mutable snapshot
+before source changes; compare refuses to run without that external digest.
 
 After the implementation is already behaviorally green:
 
@@ -171,10 +172,11 @@ python3 scripts/distill_check.py snapshot \
   --root . --scope <changed-module> \
   --out .wincreator/distill-before.json
 
-# simplify without changing the intended behavior
+# freeze the printed baseline digest in pre-change evidence, then simplify
 
 python3 scripts/distill_check.py compare \
   --before .wincreator/distill-before.json \
+  --baseline-digest <frozen-baseline-sha256> \
   --root . \
   --out .wincreator/distill-report.json
 ~~~
