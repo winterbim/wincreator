@@ -64,10 +64,15 @@ python3 "$WC/scripts/wincreator.py" prove M1 \
   --ledger PROOF_LEDGER.md \
   -- python3 check_example.py
 
+python3 "$WC/scripts/challenge_packet.py" create \
+  --attestation <attestation.json> \
+  --out .wincreator/challenge-packet.json
+
 python3 "$WC/scripts/wincreator.py" review M1 \
   --verdict evidenced \
   --reviewer demo-skeptic \
   --challenge "attack whether the captured gate is sufficient for the exact claim" \
+  --challenge-packet .wincreator/challenge-packet.json \
   --ledger PROOF_LEDGER.md
 ```
 
