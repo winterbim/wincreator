@@ -17,7 +17,7 @@ description: >-
 
 ## Why this skill exists
 
-Every agent-assisted engineering session degrades the same three ways, and
+Every agent-assisted engineering session degrades the same four ways, and
 knowing them is the key to using this skill well:
 
 1. **Optimism leak** — the same context that wrote the code grades its own
@@ -26,11 +26,14 @@ knowing them is the key to using this skill well:
    the agent drifts from the original need without noticing.
 3. **Stuck loops** — a failing check gets re-attacked at the same level again
    and again, when the real defect lives one level up.
+4. **Complexity creep** — a green implementation accumulates wrappers,
+   dependencies, duplicate rules and speculative abstractions because tests
+   prove behavior, not structural economy.
 
 This skill counters each one mechanically, not aspirationally: optimism leak
 → Proof Ledger + Builder/Skeptic separation; context rot → the Loop Panel;
-stuck loops → the Two-Failure Rule. Everything else in this file exists to
-serve those three defenses.
+stuck loops → the Two-Failure Rule; complexity creep → the Distillation Gate.
+Everything else in this file exists to serve those four defenses.
 
 > **Evidence > Assertion. Truth > Speed. Rigor > Improvisation.**
 
@@ -143,6 +146,53 @@ simulation) → VERIFY (execute the proof, quote the raw result) → REFACTOR
 
 **Nano** — one targeted change; never silent, always one immediate real
 check (compile, lint, quick run).
+
+## The Distillation Gate (code-producing Meso+ tasks)
+
+A green implementation is a **candidate**, not automatically the final shape.
+For Standard and Regulated Meso+ work that produces or substantially changes
+code, run one behavior-preserving distillation pass before final proof. Lite,
+Nano, exploration and tiny fixes do not inherit this ceremony.
+
+The target is **minimum sufficient structure**, not minimum line count. Never
+compress code merely to win a metric. Instead attack avoidable wrappers,
+duplicate rules, speculative flexibility, unnecessary files and dependencies,
+then prove the behavior again.
+
+The mechanical helper keeps a vector rather than a fake quality score:
+source-file count, nonblank lines, recognized direct dependencies, exact
+duplicate fingerprints and largest-file size. It also binds the scan policy by
+digest.
+
+After the implementation is already behaviorally green:
+
+~~~
+python3 scripts/distill_check.py snapshot \
+  --root . --scope <changed-module> \
+  --out .wincreator/distill-before.json
+
+# simplify without changing the intended behavior
+
+python3 scripts/distill_check.py compare \
+  --before .wincreator/distill-before.json \
+  --root . \
+  --out .wincreator/distill-report.json
+~~~
+
+Interpretation is deliberately narrow:
+
+- **IMPROVED** — at least one tracked lower-is-better dimension fell and none
+  rose. Evidence of measured simplification, not proof of global optimality.
+- **UNCHANGED** — no measured movement. Not a failure and not proof that no
+  simpler design exists.
+- **REVIEW_REQUIRED** — any tracked regression, any newly introduced direct
+  dependency, or any scan warning. Deterministic evidence may force more
+  review; an LLM explanation may never silently downgrade it.
+
+Then rerun the real behavior gate and bind both structural artifacts to the
+normal capture with --file. Correctness still comes from the behavior gate;
+the distillation report is maintainability evidence. Full protocol and limits:
+references/code-distillation.md.
 
 ## The Proof Ledger (Meso+ tasks)
 
@@ -307,7 +357,8 @@ evaporate when the session ends:
    improvement path — mechanical, evidence-driven, never aspirational.
 
 The skill's own tooling obeys the same law: `python3 scripts/ledger_check.py
---self-test`, `python3 scripts/wincreator.py --self-test` and
+--self-test`, `python3 scripts/wincreator.py --self-test`,
+`python3 scripts/distill_check.py --self-test` and
 `python3 scripts/package_check.py --self-test` run the embedded adversarial
 suites that once broke earlier versions of each script. Run it before trusting the mechanical gate — a verifier that was
 never itself attacked is an unverified claim. `--catches` closes the loop
@@ -320,19 +371,23 @@ evolution, and now the gate can say so.
 1. Classify: level + weight, stated in one line.
 2. Announce the truth gate before starting. Open the Loop Panel (Meso+).
 3. Build (Builder role). Ledger rows enter as CLAIMED.
-4. Capture the gate with `wincreator prove`, then review the capture from the
-   Skeptic role with `wincreator review`. Only review writes `EVIDENCED` in
+4. For Standard/Regulated code-producing Meso+ work, distill the green
+   candidate: snapshot → simplify → compare. REVIEW_REQUIRED cannot be
+   downgraded by Builder prose.
+5. Capture the final behavior gate with `wincreator prove`, binding the
+   distillation artifacts with `--file` when used; then review the capture
+   from the Skeptic role. Only review writes `EVIDENCED` in
    Standard/Regulated.
-5. Report the raw proof result, never an optimistic summary. Re-emit the
+6. Report the raw proof result, never an optimistic summary. Re-emit the
    Panel.
-6. Gate failed once → iterate. Failed twice → Two-Failure level audit.
-7. Gate captured pass + review EVIDENCED → report up explicitly with what was proven.
-8. Proof not executable → PENDING, never assumed. Re-check PENDING/BLOCKED
+7. Gate failed once → iterate. Failed twice → Two-Failure level audit.
+8. Gate captured pass + review EVIDENCED → report up explicitly with what was proven.
+9. Proof not executable → PENDING, never assumed. Re-check PENDING/BLOCKED
    at Meso close: waiting is not a freeze.
-9. End of Meso loop: `python3 scripts/ledger_check.py` as the final
-   mechanical gate (`--self-test` first if the script is newly installed;
-   `--strict-attestation` in the Regulated tier).
-10. Skeptic catch occurred → one line in `SKEPTIC_CATCHES.md` before
+10. End of Meso loop: `python3 scripts/ledger_check.py` as the final
+    mechanical gate (`--self-test` first if the script is newly installed;
+    `--strict-attestation` in the Regulated tier).
+11. Skeptic catch occurred → one line in `SKEPTIC_CATCHES.md` before
     closing the loop. The next loop's gate inherits it.
 
 References — read when the situation calls for them:
@@ -340,6 +395,8 @@ References — read when the situation calls for them:
   catch that changed the outcome. Read first if the protocol feels abstract.
 - `references/proof-ledger.md` — ledger format, statuses, template, limits
 - `references/attestation.md` — attestations, signing, `verify`'s limits
+- `references/code-distillation.md` — structural snapshots, monotonic review,
+  metrics and limits
 - `references/agents.md` — Builder/Skeptic/Scout role prompts, delegation
 - `references/gate-checklist-generique.md` — domain-adaptable proof checklist
 - `references/loop-ticket-template.md` — iteration traceability template
