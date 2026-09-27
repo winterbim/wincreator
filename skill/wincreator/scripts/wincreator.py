@@ -905,6 +905,18 @@ def review_attestation(
     tier = payload["policy"]["tier"]
     if tier in {"standard", "regulated"} and reviewer == payload["builder"]:
         raise ValueError(f"{tier.title()} builder and reviewer must differ")
+    challenge = str(challenge or "").strip()
+    if not challenge:
+        if tier == "lite" and automatic:
+            challenge = (
+                "Lite automatic review: the direct gate passed; "
+                "this tier does not require an independent adversarial challenge."
+            )
+        else:
+            raise ValueError(
+                "review challenge must be non-empty; name the concrete falsification "
+                "attempt, evidence gap, or counterexample checked"
+            )
     packet_binding = None
     if challenge_packet:
         packet_path = os.path.abspath(challenge_packet)
@@ -934,18 +946,6 @@ def review_attestation(
             f"{tier.title()} review requires --challenge-packet so the verdict is "
             "bound to blind-safe evidence"
         )
-    challenge = str(challenge or "").strip()
-    if not challenge:
-        if tier == "lite" and automatic:
-            challenge = (
-                "Lite automatic review: the direct gate passed; "
-                "this tier does not require an independent adversarial challenge."
-            )
-        else:
-            raise ValueError(
-                "review challenge must be non-empty; name the concrete falsification "
-                "attempt, evidence gap, or counterexample checked"
-            )
     review_path = os.path.join(os.path.dirname(attestation_path), "review.json")
     if os.path.exists(review_path):
         raise FileExistsError(
