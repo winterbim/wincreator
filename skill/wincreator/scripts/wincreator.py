@@ -36,10 +36,11 @@ def _tool_version():
 
 VERSION = _tool_version()
 ATTESTATION_SCHEMA = "wincreator.attestation/v1"
-REVIEW_SCHEMA = "wincreator.review/v2"
+REVIEW_SCHEMA = "wincreator.review/v3"
 REVIEW_SCHEMA_FILES = {
     "wincreator.review/v1": "review-v1.schema.json",
     "wincreator.review/v2": "review-v2.schema.json",
+    "wincreator.review/v3": "review-v3.schema.json",
 }
 DEFAULT_ATTEST_DIR = ".wincreator/attestations"
 DEFAULT_LEDGER = "PROOF_LEDGER.md"
@@ -875,6 +876,7 @@ def review_attestation(
     automatic=False,
     expected_claim_id=None,
     challenge=None,
+    challenge_packet=None,
 ):
     verdict = verdict.upper()
     reviewer = str(reviewer).strip()
@@ -903,6 +905,35 @@ def review_attestation(
     tier = payload["policy"]["tier"]
     if tier in {"standard", "regulated"} and reviewer == payload["builder"]:
         raise ValueError(f"{tier.title()} builder and reviewer must differ")
+    packet_binding = None
+    if challenge_packet:
+        packet_path = os.path.abspath(challenge_packet)
+        packet = _load_json(packet_path)
+        if packet.get("schema") != "wincreator.challenge-packet/v1":
+            raise ValueError("invalid challenge packet schema")
+        packet_payload = packet.get("payload")
+        if not isinstance(packet_payload, dict):
+            raise ValueError("challenge packet payload must be an object")
+        if packet.get("digest") != canonical_digest(packet_payload):
+            raise ValueError("challenge packet digest mismatch")
+        if packet_payload.get("attestation_digest") != attestation["digest"]["value"]:
+            raise ValueError("challenge packet does not bind this capture")
+        if packet_payload.get("claim") != payload["claim"]:
+            raise ValueError("challenge packet claim does not match capture")
+        if any(key in packet_payload for key in ("builder", "environment", "ledger")):
+            raise ValueError("challenge packet leaks builder-context metadata")
+        retained_packet = os.path.join(os.path.dirname(attestation_path), "challenge-packet.json")
+        if os.path.realpath(packet_path) != os.path.realpath(retained_packet):
+            shutil.copyfile(packet_path, retained_packet)
+        packet_binding = {
+            "path": portable_path(os.path.basename(retained_packet)),
+            "digest": packet["digest"],
+        }
+    elif tier in {"standard", "regulated"}:
+        raise ValueError(
+            f"{tier.title()} review requires --challenge-packet so the verdict is "
+            "bound to blind-safe evidence"
+        )
     challenge = str(challenge or "").strip()
     if not challenge:
         if tier == "lite" and automatic:
@@ -948,6 +979,7 @@ def review_attestation(
         "verdict": verdict,
         "reviewer": reviewer,
         "challenge": challenge,
+        "challenge_packet": packet_binding,
         "reviewed_at": reviewed_at,
         "automatic": bool(automatic),
     }
@@ -1081,6 +1113,31 @@ def verify_review(path, capture_path=None):
         tier = capture_payload.get("policy", {}).get("tier")
         if tier in {"standard", "regulated"} and payload.get("reviewer") == capture_payload.get("builder"):
             problems.append(f"{tier.title()} builder and reviewer are not independent")
+        if review.get("schema") == "wincreator.review/v3":
+            binding = payload.get("challenge_packet")
+            if tier in {"standard", "regulated"} and not binding:
+                problems.append(f"{tier.title()} review has no bound challenge packet")
+            if binding:
+                packet_path = os.path.join(os.path.dirname(path), binding.get("path", ""))
+                try:
+                    packet = _load_json(packet_path)
+                    packet_payload = packet.get("payload")
+                    if packet.get("schema") != "wincreator.challenge-packet/v1":
+                        problems.append("bound challenge packet has invalid schema")
+                    elif not isinstance(packet_payload, dict):
+                        problems.append("bound challenge packet payload is invalid")
+                    elif packet.get("digest") != canonical_digest(packet_payload):
+                        problems.append("bound challenge packet digest mismatch")
+                    elif packet.get("digest") != binding.get("digest"):
+                        problems.append("review challenge-packet digest does not match retained packet")
+                    elif packet_payload.get("attestation_digest") != capture.get("digest", {}).get("value"):
+                        problems.append("bound challenge packet does not reference this capture")
+                    elif packet_payload.get("claim") != capture_payload.get("claim"):
+                        problems.append("bound challenge packet claim does not match capture")
+                    elif any(key in packet_payload for key in ("builder", "environment", "ledger")):
+                        problems.append("bound challenge packet leaks builder-context metadata")
+                except (OSError, json.JSONDecodeError) as error:
+                    problems.append(f"cannot verify bound challenge packet: {error}")
     return not problems, problems
 
 
@@ -1295,6 +1352,7 @@ def cmd_review(args):
             automatic=args.automatic,
             expected_claim_id=args.claim_id,
             challenge=args.challenge,
+            challenge_packet=args.challenge_packet,
         )
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
@@ -1432,6 +1490,10 @@ def build_parser():
     review.add_argument(
         "--challenge",
         help="concrete falsification attempt, evidence gap, or counterexample checked",
+    )
+    review.add_argument(
+        "--challenge-packet",
+        help="blind-safe challenge packet bound to the reviewed capture",
     )
     review.add_argument("--attestation")
     review.add_argument("--attest-dir", default=DEFAULT_ATTEST_DIR)
