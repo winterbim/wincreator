@@ -349,10 +349,13 @@ def self_test():
 
         marker = root / "descendant-survived"
         spawner = root / "spawner.py"
+        child_code = (
+            "import time,pathlib; time.sleep(1); "
+            f"pathlib.Path({str(marker)!r}).write_text('bad')"
+        )
         spawner.write_text(
             "import subprocess,sys,time\n"
-            "subprocess.Popen([sys.executable,'-c',"
-            "f\"import time,pathlib; time.sleep(1); pathlib.Path(r'{marker}').write_text('bad')\"])\n"
+            f"subprocess.Popen([sys.executable, '-c', {child_code!r}])\n"
             "time.sleep(10)\n",
             encoding="utf-8",
         )
