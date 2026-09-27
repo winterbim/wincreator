@@ -134,10 +134,17 @@ def relevant_files(root, scopes, policy, warnings):
             candidates = []
             for current, dirs, files in os.walk(scope, topdown=True, followlinks=False):
                 base = Path(current)
-                dirs[:] = [
-                    name for name in dirs
-                    if name not in policy["exclude_dirs"] and not excluded((base / name).relative_to(root), policy)
-                ]
+                kept_dirs = []
+                for name in dirs:
+                    child = base / name
+                    rel_dir = child.relative_to(root)
+                    if child.is_symlink():
+                        warnings.append(f"symlink directory ignored: {rel_dir.as_posix()}")
+                        continue
+                    if name in policy["exclude_dirs"] or excluded(rel_dir, policy):
+                        continue
+                    kept_dirs.append(name)
+                dirs[:] = kept_dirs
                 candidates.extend(base / name for name in files)
         for path in candidates:
             rel = path.relative_to(root)
@@ -178,9 +185,10 @@ def read_utf8(path, rel, warnings):
 def dependency_names(rel, text):
     """Return only dependencies we can parse without heuristic manifest grammars.
 
-    JSON and requirements files have a small, stable parsing surface here.
-    TOML/go.mod manifests are fingerprinted instead; changing one forces review
-    rather than risking a false-clean result from a partial parser.
+    JSON and simple direct requirements files have a small parsing surface here.
+    Complex requirements directives and TOML/go.mod manifests are treated as
+    opaque; changing them or merely encountering unsupported requirements syntax
+    forces review rather than risking a false-clean result from a partial parser.
     """
     deps, warnings = set(), []
     if rel.name == "package.json":
@@ -193,12 +201,25 @@ def dependency_names(rel, text):
                 deps.update(f"npm:{name}" for name in data[section])
         return deps, warnings, True
     if fnmatch.fnmatch(rel.name, "requirements*.txt"):
+        lines = []
         for raw in text.splitlines():
             line = raw.split("#", 1)[0].strip()
-            if line and not line.startswith(("-r", "--requirement", "-c", "--constraint")):
-                name = re.split(r"[<>=!~;\s\[]", line, 1)[0]
-                if name:
-                    deps.add(f"python:{name.lower()}")
+            if not line:
+                continue
+            if line.startswith(("-", ".", "/", "git+", "http://", "https://")):
+                warnings.append(
+                    f"unsupported requirements syntax; treating manifest as opaque: {rel.as_posix()}"
+                )
+                return set(), warnings, False
+            lines.append(line)
+        for line in lines:
+            name = re.split(r"[<>=!~;\s\[]", line, 1)[0]
+            if not name or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
+                warnings.append(
+                    f"unsupported requirements entry; treating manifest as opaque: {rel.as_posix()}"
+                )
+                return set(), warnings, False
+            deps.add(f"python:{name.lower()}")
         return deps, warnings, True
     return deps, warnings, False
 
