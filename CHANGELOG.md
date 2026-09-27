@@ -12,6 +12,11 @@ history remains available in Git and is not restated here.
 ## [Unreleased]
 
 ### Added
+- Structural Distillation Gate: stdlib-only `scripts/distill_check.py` captures
+  deterministic before/after snapshots, policy digests, direct-dependency
+  changes, duplicate fingerprints and monotonic `REVIEW_REQUIRED` verdicts.
+- `references/code-distillation.md` plus adversarial tests for tampered
+  snapshots, scope escape and dependency replacement.
 - Machine-checkable `schemas/review-v1.schema.json`; review records are now
   schema-validated before persistence and during verification.
 - Dirty-worktree content fingerprinting in capture Git context, covering changed
@@ -35,6 +40,10 @@ history remains available in Git and is not restated here.
   to the capture directory.
 
 ### Changed
+- Standard/Regulated code-producing Meso+ loops now include a behavior-preserving
+  distillation pass before final proof; structural artifacts are bound through
+  the existing `--file` attestation mechanism instead of expanding the proof
+  kernel.
 - Reviews are immutable per capture. A different verdict requires a new capture,
   preserving the audit trail instead of rewriting it in place.
 
