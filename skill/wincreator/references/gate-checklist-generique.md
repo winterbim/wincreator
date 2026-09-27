@@ -19,6 +19,18 @@ Cette checklist ne présuppose aucun langage ni stack. Avant d'appliquer une gat
 - [ ] Le comportement est reproductible : rejouer la même preuve donne le même résultat
 - [ ] Ce qui n'a pas été vérifié est dit clairement comme tel (dette explicite), pas présenté comme acquis
 
+## Force de preuve
+
+- [ ] Pour un nouveau comportement critique, le test d'acceptation a été défini et, si possible, figé avant l'implémentation ; il n'a pas été affaibli après avoir vu le code
+- [ ] Un pourcentage de couverture n'est pas présenté comme preuve d'absence de défaut ; si la portée du claim le justifie, une attaque indépendante a été utilisée (mutation, propriété/métamorphique, différentiel, fuzz, sécurité, performance)
+- [ ] La preuve choisie est capable d'échouer quand le comportement attendu est absent, et pas seulement de produire un résultat vert
+
+## Économie de changement
+
+- [ ] Chaque nouveau fichier, dépendance, abstraction ou interface publique est directement requis ou explicitement justifié
+- [ ] Le diff ne contient pas de travail opportuniste non demandé mélangé au claim principal
+- [ ] Une solution plus simple par réutilisation, suppression ou réduction de portée a été considérée avant d'ajouter une nouvelle couche
+
 ## Propreté
 
 - [ ] Le travail respecte les conventions déjà établies dans le projet (style, structure, nommage) plutôt que d'en introduire de nouvelles sans raison
