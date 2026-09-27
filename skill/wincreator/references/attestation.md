@@ -8,8 +8,13 @@ python3 scripts/wincreator.py prove P-014 \
   --file dist/report.ifc \
   -- pytest tests/test_export.py -q
 
+python3 scripts/challenge_packet.py create \
+  --attestation <attestation.json> --out challenge-packet.json
+
 python3 scripts/wincreator.py review P-014 \
-  --verdict evidenced --reviewer skeptic-01
+  --verdict evidenced --reviewer skeptic-01 \
+  --challenge "attack the evidence" \
+  --challenge-packet challenge-packet.json
 
 python3 scripts/wincreator.py verify --ledger PROOF_LEDGER.md
 ```
@@ -32,11 +37,11 @@ CI and tool-driven reviews must pass `--automatic`, which records
 `automatic: true`; that marker is not a substitute for authenticated human
 approval in the surrounding PR or compliance process.
 
+Standard/Regulated v3 reviews also bind a retained `challenge-packet.json`. The packet contains the claim, command and raw evidence needed for review while omitting Builder identity, environment identity and ledger metadata. This reduces optimism/context leakage; it is not OS-level access control.
+
 ## Canonical schemas
 
-`schemas/attestation-v1.schema.json` is authoritative for captures and
-`schemas/review-v1.schema.json` is authoritative for reviews. Both are validated
-before persistence and again during verification.
+`schemas/attestation-v1.schema.json` is authoritative for captures. New reviews use `schemas/review-v3.schema.json`; historical v1/v2 reviews remain verifiable. Schemas are validated before persistence and again during verification.
 
 For captures, the top-level fields are exactly:
 
