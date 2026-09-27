@@ -1425,9 +1425,44 @@ def self_test():
         )
         check("capture_pass", code == 0 and attestation["payload"]["capture"]["status"] == "CAPTURED_PASS")
         check("review_required", read_claim(ledger, "P1")["status"] == "PENDING")
+        packet_payload = {
+            "attestation_digest": attestation["digest"]["value"],
+            "claim": attestation["payload"]["claim"],
+            "capture": attestation["payload"]["capture"],
+            "command": attestation["payload"]["command"],
+            "stdout": {
+                key: attestation["payload"]["stdout"].get(key)
+                for key in ("sha256", "original_bytes", "stored_bytes", "truncated", "body_stored", "tail")
+            },
+            "stderr": {
+                key: attestation["payload"]["stderr"].get(key)
+                for key in ("sha256", "original_bytes", "stored_bytes", "truncated", "body_stored", "tail")
+            },
+            "files": attestation["payload"].get("files", []),
+            "git": {
+                key: attestation["payload"].get("git", {}).get(key)
+                for key in (
+                    "available", "commit", "tree", "branch", "dirty",
+                    "submodules", "untracked_digest", "worktree_digest",
+                )
+                if key in attestation["payload"].get("git", {})
+            },
+            "policy": {
+                "tier": attestation["payload"].get("policy", {}).get("tier"),
+                "private": attestation["payload"].get("policy", {}).get("private"),
+            },
+        }
+        packet_document = {
+            "schema": "wincreator.challenge-packet/v1",
+            "payload": packet_payload,
+            "digest": canonical_digest(packet_payload),
+        }
+        packet_path = os.path.join(directory, "challenge-input.json")
+        _atomic_json(packet_path, packet_document)
         review_attestation(
             path, "EVIDENCED", "skeptic", ledger,
             challenge="attack whether a passing command actually proves the claim",
+            challenge_packet=packet_path,
         )
         check("review_evidenced", read_claim(ledger, "P1")["status"] == "EVIDENCED")
         _checked, problems = verify_ledger_references(ledger)
