@@ -4,13 +4,16 @@ import shutil
 
 import pytest
 
-from conftest import prove
+from conftest import make_challenge_packet, prove
 
 
 def reviewed_capture(wincreator, ledger, tmp_path):
     attestation, path, _code = prove(wincreator, ledger, tmp_path)
+    packet = make_challenge_packet(wincreator, attestation, path)
     wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01",
+        challenge="test falsification challenge", challenge_packet=str(packet),
+        ledger=str(ledger)
     )
     return attestation, Path(path)
 
@@ -118,10 +121,12 @@ def test_capture_bundle_remains_verifiable_after_relocation(
         tier="standard",
     )
     assert code == 0
+    packet = make_challenge_packet(wincreator, _attestation, path)
     wincreator.review_attestation(
         path,
         verdict="EVIDENCED",
         reviewer="portable-skeptic", challenge="test falsification challenge",
+        challenge_packet=str(packet),
         ledger=str(bundled_ledger),
     )
     relative_attestation = Path(path).relative_to(bundle)
