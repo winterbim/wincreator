@@ -36,6 +36,7 @@ jobs:
           python skill/wincreator/scripts/ledger_check.py --self-test
           python skill/wincreator/scripts/wincreator.py --self-test
           python skill/wincreator/scripts/distill_check.py --self-test
+          python skill/wincreator/scripts/adequacy_check.py self-test
           python skill/wincreator/scripts/package_check.py --self-test
       - name: Run external adversarial suite
         run: python -m pytest -q
