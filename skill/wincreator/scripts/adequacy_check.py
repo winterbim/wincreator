@@ -190,7 +190,7 @@ def run_adequacy(root, manifest, command, timeout=120):
 
         for index, mutation in enumerate(manifest["mutations"]):
             case_root = temporary / f"case-{index:03d}"
-            shutil.copytree(frozen, case_root, symlinks=False)
+            shutil.copytree(frozen, case_root, ignore=_ignore, symlinks=False)
             required = mutation.get("required", True)
             record = {
                 "id": mutation["id"],
