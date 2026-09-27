@@ -67,6 +67,7 @@ python3 "$WC/scripts/wincreator.py" prove M1 \
 python3 "$WC/scripts/wincreator.py" review M1 \
   --verdict evidenced \
   --reviewer demo-skeptic \
+  --challenge "attack whether the captured gate is sufficient for the exact claim" \
   --ledger PROOF_LEDGER.md
 ```
 
