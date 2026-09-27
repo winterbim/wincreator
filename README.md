@@ -249,6 +249,7 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 | [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | real Skeptic catch |
 | [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | full protocol |
 | [`docs/DEMO.md`](docs/DEMO.md) | short demonstration flow |
+| [`docs/STATE_OF_ART_2026-09.md`](docs/STATE_OF_ART_2026-09.md) | dated competitive/state-of-the-art audit with falsification rule |
 | [Releases](https://github.com/winterbim/wincreator/releases) | packaged artifacts |
 
 ## License
