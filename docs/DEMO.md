@@ -64,8 +64,9 @@ Use the generated claim ID from the previous command:
 python3 "$WC/scripts/wincreator.py" review <CLAIM_ID> \
   --ledger .wincreator/PROOF_LEDGER.md \
   --verdict insufficient \
-  --reviewer demo-skeptic
-  --challenge "attack whether the captured gate is sufficient for the exact claim" \
+  --reviewer demo-skeptic \
+  --challenge "attack whether the captured gate actually covers the missing error path"
+  --challenge "attack whether the captured gate is sufficient for the exact claim"
 ```
 
 Say:
