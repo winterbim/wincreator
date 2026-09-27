@@ -8,6 +8,7 @@ the strength of "it works." Two things are required of every pull request.
 ```
 python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
+python3 skill/wincreator/scripts/distill_check.py --self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
@@ -28,6 +29,11 @@ python3 skill/wincreator/scripts/wincreator.py prove P-XX \
 python3 skill/wincreator/scripts/wincreator.py review P-XX \
   --verdict evidenced --reviewer skeptic-id
 ```
+
+For Standard/Regulated code-producing Meso+ changes, also attach the
+Distillation Gate report when structural complexity materially changed. A
+`REVIEW_REQUIRED` report is not an automatic rejection, but its regression
+must be addressed explicitly in the Skeptic pass.
 
 `CLAIMED`, `DISPROVEN`, and `INSUFFICIENT` rows do not merge. `PENDING` and `BLOCKED` may merge only while the named wait is still true — re-check them before calling the loop done.
 
