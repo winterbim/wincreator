@@ -9,7 +9,8 @@ python3 scripts/wincreator.py prove P-014 \
   -- pytest tests/test_export.py -q
 
 python3 scripts/wincreator.py review P-014 \
-  --verdict evidenced --reviewer skeptic-01
+  --verdict evidenced --reviewer skeptic-01 \
+  --challenge "attack whether the captured gate is sufficient for the exact claim"
 
 python3 scripts/wincreator.py verify --ledger PROOF_LEDGER.md
 ```
@@ -35,7 +36,7 @@ approval in the surrounding PR or compliance process.
 ## Canonical schemas
 
 `schemas/attestation-v1.schema.json` is authoritative for captures and
-`schemas/review-v1.schema.json` is authoritative for reviews. Both are validated
+`schemas/review-v1.schema.json` remains the legacy review schema and `schemas/review-v2.schema.json` is authoritative for new reviews. These schemas are validated
 before persistence and again during verification.
 
 For captures, the top-level fields are exactly:
