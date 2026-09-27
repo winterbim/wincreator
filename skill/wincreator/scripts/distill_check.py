@@ -395,6 +395,19 @@ def cmd_snapshot(args):
     return 0
 
 
+def cmd_verify(args):
+    try:
+        snap = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+        verify_snapshot(snap)
+        if snap["digest"] != args.expect_digest:
+            raise ValueError("external baseline digest mismatch")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(f"[VERIFIED] {args.snapshot} sha256={snap['digest']}")
+    return 0
+
+
 def cmd_compare(args):
     try:
         before = json.loads(Path(args.before).read_text(encoding="utf-8"))
@@ -467,6 +480,9 @@ def build_parser():
     snap.add_argument("--scope", action="append", default=[])
     snap.add_argument("--policy")
     snap.add_argument("--out", required=True)
+    verify = sub.add_parser("verify")
+    verify.add_argument("--snapshot", required=True)
+    verify.add_argument("--expect-digest", required=True)
     comp = sub.add_parser("compare")
     comp.add_argument("--before", required=True)
     comp.add_argument("--baseline-digest", required=True)
@@ -483,6 +499,8 @@ def main(argv=None):
         return self_test()
     if args.command == "snapshot":
         return cmd_snapshot(args)
+    if args.command == "verify":
+        return cmd_verify(args)
     if args.command == "compare":
         return cmd_compare(args)
     parser.print_help()
