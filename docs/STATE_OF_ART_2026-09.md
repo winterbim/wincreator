@@ -144,6 +144,85 @@ Observed boundary: repository rules and review artifacts are validated, but the 
 itself states that it does not judge whether a model behaved well. WinCreator's target is
 to bind claims to actually captured gates and then independently review that binding.
 
+### Proof Loop
+Source: https://github.com/LeoStehlik/proof-loop
+
+Very close on task-level process: frozen acceptance criteria, separate fresh verifier,
+durable proof artifacts, and a mechanical done gate. It is intentionally small and
+harness-agnostic.
+
+Observed boundary: the surveyed version centers on frozen ACs and verifier verdicts; it
+does not expose WinCreator's command-capture attestation/history model, structural
+distillation, Two-Failure level escalation, or release-provenance layer.
+
+### Prove It
+Source: https://github.com/Pablo-aps/prove-it
+
+Strongest lightweight falsification-first skill found in the survey. It freezes the claim,
+asks what would make it false, actively searches for disconfirming evidence, and rejects
+counterfeit proof such as weakened assertions or ignored failures.
+
+This directly influenced WinCreator review v2: new reviews bind a concrete adversarial
+`challenge` into the review artifact instead of recording only reviewer identity and
+verdict.
+
+### evigate
+Source: https://github.com/shiki-yusuke/evigate
+
+Strong post-hoc claim/evidence architecture. It separates immutable tool-observed events
+from agent-declared claims and uses deterministic detectors for test/build/failure/scope
+claims. Its evaluation harness is especially strong: known-answer mutations are generated
+without invoking the detector being evaluated, preventing circular self-grading.
+
+Observed boundary: evigate is transcript-oriented and conservative by design
+(`task_done` is never proven). WinCreator instead defines claims/gates before or during
+work, captures the gate directly, and carries proof state through a ledger. evigate's
+acyclic mutation-evaluation principle is a useful benchmark for WinCreator's verifier
+self-tests and adversarial corpus.
+
+### Agent Audits
+Source: https://github.com/aiswarya797/agent-audits
+
+A close repo-local proof-of-done loop: goal → acceptance criteria → evidence → review →
+check → report. It hashes attached artifacts and requires current reviewed evidence.
+
+Its documented limits explicitly exclude signed audit logs, sandboxing and permission
+enforcement. WinCreator's target adds tamper-evident claim-bound captures, longitudinal
+verification, adversarial challenge binding, distillation and release provenance.
+
+### AgentClaimGuard
+Source: https://github.com/konoeph/AgentClaimGuard
+
+A lightweight claim/evidence/tool policy gate for general LLM applications. It is strong
+on typed evidence contracts and correctly states that satisfying a contract is not the
+same as proving factual truth.
+
+Observed boundary: it is not specialized around repository engineering loops, code
+minimality, frozen acceptance tests or software proof history.
+
+### Orvena
+Source: https://github.com/williamlabdev/Orvena
+
+A particularly relevant governance competitor: OS-enforced task-scope boundaries, verify
+gates, frozen evidence and differential evaluation between governed and baseline agent
+runs.
+
+This is stronger than WinCreator when operating-system containment itself is the target.
+WinCreator should not duplicate an OS governance runtime; VEOR/Orvena-style containment is
+a composition partner. WinCreator's target remains semantic proof + scope economy +
+portable engineering protocol.
+
+### ToppleCat
+Source: https://github.com/samzhu/topplecat
+
+A strong specialized Java/JUnit acceptance system using executable contracts, hidden
+retests and mutation gates. It demonstrates that anti-overfitting evidence can be stronger
+than ordinary visible tests.
+
+Observed boundary: language/ecosystem scope is deliberately narrower. WinCreator adopts
+the principle through negative-space proof guidance rather than embedding a Java-specific
+test engine.
+
 ## WinCreator target combination
 
 The target is **not** "more agents". It is the smallest portable layer that composes the
@@ -225,6 +304,8 @@ This document becomes stale by design. Re-run the survey before making a public
 
 A competing project falsifies the current differentiation claim if it can demonstrate,
 in one coherent public system, the full target combination above with executable
-evidence—not only prompt instructions or marketing prose.
+evidence—not only prompt instructions or marketing prose. The search set must include at
+least the closest proof-of-done projects named in this document; finding a new close
+competitor is a reason to update the audit, not to defend the old conclusion.
 
 When that happens, update this document and improve WinCreator or narrow the claim.
