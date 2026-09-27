@@ -53,6 +53,42 @@ python3 bench/run_ablation.py \
 ~~~
 
 The ON workspace contains `.agents/skills/wincreator`; the OFF workspace does not.
+Every ON result also records the pre-run tree digest and VERSION of that exact
+copied Skill, so treatment identity is not inferred from the surrounding checkout.
+
+## Codex CLI adapter
+
+For a real paired run with Codex CLI, authenticate Codex first, then pin the
+same model and reasoning effort for both arms:
+
+~~~bash
+export WINCREATOR_BENCH_MODEL="<exact-model-id>"
+export WINCREATOR_BENCH_REASONING_EFFORT="high"
+
+python3 bench/run_ablation.py \
+  --output bench-results/codex \
+  --repetitions 3 \
+  --condition both \
+  -- python3 bench/adapters/codex_exec.py
+~~~
+
+The adapter uses Codex non-interactively with an ephemeral session, JSONL
+events, closed stdin, explicit `workspace-write` sandboxing and approval policy
+`never`. It does **not** use the dangerous sandbox/approval bypass. User config
+and exec-policy rules are ignored by default to reduce uncontrolled treatment
+differences; pass `--keep-user-config` only when that configuration is itself
+part of the declared benchmark environment.
+
+The adapter writes normalized provider metrics outside the workspace. When
+Codex emits a terminal `turn.completed` event, token usage is retained in the
+run result. The requested model ID is recorded. Unless the JSONL event also
+contains a provider-reported `server_model`, model identity is marked
+`unavailable` rather than pretending the requested alias independently proves
+what the provider served.
+
+Codex CLI has had non-TTY stdin regressions in automation environments. The
+adapter supplies `DEVNULL` explicitly, so a positional prompt cannot hang while
+waiting for inherited stdin.
 
 ## Oracle isolation
 
