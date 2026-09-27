@@ -1367,7 +1367,10 @@ def self_test():
         )
         check("capture_pass", code == 0 and attestation["payload"]["capture"]["status"] == "CAPTURED_PASS")
         check("review_required", read_claim(ledger, "P1")["status"] == "PENDING")
-        review_attestation(path, "EVIDENCED", "skeptic", ledger)
+        review_attestation(
+            path, "EVIDENCED", "skeptic", ledger,
+            challenge="attack whether a passing command actually proves the claim",
+        )
         check("review_evidenced", read_claim(ledger, "P1")["status"] == "EVIDENCED")
         _checked, problems = verify_ledger_references(ledger)
         check("verify_round_trip", not problems)
