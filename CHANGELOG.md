@@ -11,6 +11,9 @@ history remains available in Git and is not restated here.
 
 ## [Unreleased]
 
+### Added
+- Evidence Adequacy Gate: deterministic isolated fault injection verifies that a declared behavior gate can actually detect claim-relevant seeded regressions; required survivors produce `INSUFFICIENT` and reports are digest-bound.
+
 ## [3.1.0] — 2026-09-27
 
 ### Added
