@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -69,22 +70,45 @@ def structure(root):
     }
 
 
+def _terminate_process_tree(process):
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if process.poll() is None:
+            process.kill()
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def run_process(command, cwd, timeout, env=None):
     started = time.monotonic()
+    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=(os.name != "nt"),
+        creationflags=creationflags,
+    )
     try:
-        completed = subprocess.run(
-            command, cwd=cwd, env=env, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, timeout=timeout, check=False,
-        )
-        status, code = "completed", completed.returncode
-        stdout, stderr = completed.stdout, completed.stderr
-    except subprocess.TimeoutExpired as exc:
+        stdout, stderr = process.communicate(timeout=timeout)
+        status, code = "completed", process.returncode
+    except subprocess.TimeoutExpired:
+        _terminate_process_tree(process)
+        stdout, stderr = process.communicate()
         status, code = "timeout", None
-        stdout, stderr = exc.stdout or "", exc.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode(errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode(errors="replace")
     return {
         "status": status,
         "exit_code": code,
@@ -116,12 +140,17 @@ def load_manifest(path):
 
 
 def render_command(parts, workspace, prompt, condition):
-    values = {
-        "workspace": str(workspace),
-        "prompt": str(prompt),
-        "condition": condition,
+    replacements = {
+        "{workspace}": str(workspace),
+        "{prompt}": str(prompt),
+        "{condition}": condition,
     }
-    return [part.format(**values) for part in parts]
+    rendered = []
+    for part in parts:
+        for token, value in replacements.items():
+            part = part.replace(token, value)
+        rendered.append(part)
+    return rendered
 
 
 def prepare_workspace(case, manifest_dir, condition, run_root):
@@ -148,13 +177,24 @@ def prepare_workspace(case, manifest_dir, condition, run_root):
             "Do not inspect files outside this workspace.\n"
         )
     prompt.write_text(task_text, encoding="utf-8")
-    return workspace, prompt
+    treatment = {
+        "wincreator_skill_tree_sha256": (
+            tree_digest(workspace / ".agents" / "skills" / "wincreator")
+            if condition == "on" else None
+        ),
+        "wincreator_version": (
+            (workspace / ".agents" / "skills" / "wincreator" / "VERSION")
+            .read_text(encoding="utf-8").strip()
+            if condition == "on" else None
+        ),
+    }
+    return workspace, prompt, treatment
 
 
 def run_case(case, manifest_dir, condition, repetition, agent_template, output_root):
     run_root = output_root / case["id"] / f"rep-{repetition:02d}" / condition
     run_root.mkdir(parents=True, exist_ok=False)
-    workspace, prompt = prepare_workspace(case, manifest_dir, condition, run_root)
+    workspace, prompt, treatment = prepare_workspace(case, manifest_dir, condition, run_root)
     before_digest = tree_digest(workspace)
     command = render_command(agent_template, workspace, prompt, condition)
     env = os.environ.copy()
@@ -177,6 +217,7 @@ def run_case(case, manifest_dir, condition, repetition, agent_template, output_r
         "case": case["id"],
         "condition": condition,
         "repetition": repetition,
+        "treatment": treatment,
         "task_sha256": file_sha(manifest_dir / case["task"]),
         "seed_tree_sha256": tree_digest(manifest_dir / case["seed"]),
         "grader_sha256": file_sha(grader_path),
@@ -296,7 +337,29 @@ def self_test():
         assert bundle["summary"]["off"]["passed"] == 1
         assert bundle["summary"]["on"]["passed"] == 1
         assert len(bundle["results"]) == 2
+        off = next(row for row in bundle["results"] if row["condition"] == "off")
+        on = next(row for row in bundle["results"] if row["condition"] == "on")
+        assert off["treatment"]["wincreator_skill_tree_sha256"] is None
+        assert on["treatment"]["wincreator_skill_tree_sha256"]
+        assert on["treatment"]["wincreator_version"]
         assert all(not row["isolation"]["grader_copied_into_workspace"] for row in bundle["results"])
+        assert render_command(
+            ['--config={"model":"x"}', "{condition}"], root, root / "p", "on"
+        ) == ['--config={"model":"x"}', "on"]
+
+        marker = root / "descendant-survived"
+        spawner = root / "spawner.py"
+        spawner.write_text(
+            "import subprocess,sys,time\n"
+            "subprocess.Popen([sys.executable,'-c',"
+            "f\"import time,pathlib; time.sleep(1); pathlib.Path(r'{marker}').write_text('bad')\"])\n"
+            "time.sleep(10)\n",
+            encoding="utf-8",
+        )
+        timed = run_process([sys.executable, str(spawner)], root, 0.2)
+        assert timed["status"] == "timeout"
+        time.sleep(1.2)
+        assert not marker.exists()
     print("self-test: PASS")
     return 0
 
