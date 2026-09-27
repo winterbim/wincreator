@@ -13,7 +13,7 @@ def test_review_evidenced_links_capture_and_updates_ledger(wincreator, ledger, t
     review, review_path = wincreator.review_attestation(
         str(path),
         verdict="EVIDENCED",
-        reviewer="skeptic-01",
+        reviewer="skeptic-01", challenge="test falsification challenge",
         ledger=str(ledger),
     )
 
@@ -33,7 +33,7 @@ def test_captured_fail_cannot_be_reviewed_as_evidenced(wincreator, ledger, tmp_p
 
     with pytest.raises(ValueError, match="CAPTURED_FAIL"):
         wincreator.review_attestation(
-            str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+            str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
         )
 
 
@@ -56,14 +56,14 @@ def test_regulated_builder_cannot_review_own_capture(wincreator, ledger, tmp_pat
 
     with pytest.raises(ValueError, match="must differ"):
         wincreator.review_attestation(
-            str(path), verdict="EVIDENCED", reviewer="same-person", ledger=str(ledger_path)
+            str(path), verdict="EVIDENCED", reviewer="same-person", challenge="test falsification challenge", ledger=str(ledger_path)
         )
 
 
 def test_insufficient_review_blocks_completion(wincreator, ledger_check, ledger, tmp_path):
     _attestation, path, _code = prove(wincreator, ledger, tmp_path)
     wincreator.review_attestation(
-        str(path), verdict="INSUFFICIENT", reviewer="skeptic-01", ledger=str(ledger)
+        str(path), verdict="INSUFFICIENT", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
     )
     assert wincreator.read_claim(str(ledger), "P1")["status"] == "INSUFFICIENT"
     _checked, problems = wincreator.verify_ledger_references(str(ledger))
@@ -121,7 +121,7 @@ def test_standard_builder_cannot_review_own_capture(wincreator, ledger, tmp_path
         wincreator.review_attestation(
             str(path),
             verdict="EVIDENCED",
-            reviewer="same-person",
+            reviewer="same-person", challenge="test falsification challenge",
             ledger=str(ledger),
         )
 
@@ -129,18 +129,18 @@ def test_standard_builder_cannot_review_own_capture(wincreator, ledger, tmp_path
 def test_review_is_immutable_once_written(wincreator, ledger, tmp_path):
     _attestation, path, _code = prove(wincreator, ledger, tmp_path)
     wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
     )
     with pytest.raises(FileExistsError, match="immutable review"):
         wincreator.review_attestation(
-            str(path), verdict="DISPROVEN", reviewer="skeptic-02", ledger=str(ledger)
+            str(path), verdict="DISPROVEN", reviewer="skeptic-02", challenge="test falsification challenge", ledger=str(ledger)
         )
 
 
 def test_review_schema_rejects_recomputed_unknown_fields(wincreator, ledger, tmp_path):
     _attestation, path, _code = prove(wincreator, ledger, tmp_path)
     _review, review_path = wincreator.review_attestation(
-        str(path), verdict="EVIDENCED", reviewer="skeptic-01", ledger=str(ledger)
+        str(path), verdict="EVIDENCED", reviewer="skeptic-01", challenge="test falsification challenge", ledger=str(ledger)
     )
     review_path = Path(review_path)
     document = json.loads(review_path.read_text(encoding="utf-8"))
