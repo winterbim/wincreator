@@ -24,6 +24,7 @@ def main():
     run([PYTHON, "skill/wincreator/scripts/challenge_packet.py", "self-test"])
     run([PYTHON, "bench/run_ablation.py", "--self-test"])
     run([PYTHON, "bench/validate_cases.py"])
+    run([PYTHON, "bench/adapters/codex_exec.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "skill/wincreator"])
     for ledger in (
