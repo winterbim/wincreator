@@ -10,7 +10,11 @@ plain chat.
 ### Builder
 Plans and implements inside the current loop level. Writes code, docs,
 configs. May add rows to the Proof Ledger **only with status CLAIMED**. Never
-writes EVIDENCED / PENDING / WAIVED.
+writes EVIDENCED / PENDING / WAIVED. For Standard/Regulated code-producing
+Meso+ work, the Builder also performs the Distillation Gate after the behavior
+is green: snapshot the working candidate, remove avoidable structural cost,
+compare, then rerun the behavior gate. The Builder cannot explain away a
+REVIEW_REQUIRED structural report.
 
 ### Skeptic
 Independent verifier. Receives ONLY three things: the claim, the gate
@@ -43,6 +47,10 @@ Your job:
 2. Check it proves THIS claim, not a weaker neighboring claim.
 3. Actively look for one way the claim could still be false despite this
    evidence (edge case, unexercised path, environment difference).
+4. If structural/distillation evidence is present, attack its scope and every
+   regression: a new dependency, moved duplication, hidden generated code or a
+   metric improvement that may have harmed readability/performance. A
+   deterministic REVIEW_REQUIRED result cannot be softened by prose.
 
 Verdict, exactly one of:
 - EVIDENCED: <why the evidence suffices, in 2 lines max>
