@@ -196,6 +196,29 @@ normal capture with --file. Correctness still comes from the behavior gate;
 the distillation report is maintainability evidence. Full protocol and limits:
 references/code-distillation.md.
 
+
+## Evidence Adequacy Gate (when green may be misleading)
+
+For consequential Standard/Regulated claims, a green gate is still weak if the
+gate cannot detect the failure mode it is being used to prove away. When the
+claim admits safe, deterministic fault injection, declare a few claim-relevant
+literal mutations and run:
+
+~~~
+python3 scripts/adequacy_check.py run \
+  --root . \
+  --manifest .wincreator/adequacy.json \
+  --out .wincreator/adequacy-report.json \
+  -- <real behavior gate>
+~~~
+
+The unmodified baseline must pass. Every **required** seeded fault must then make
+the gate fail; a surviving required mutation yields **INSUFFICIENT**, never a
+soft warning. Bind the manifest and adequacy report with `--file`, then rerun
+the clean behavior gate for final proof. Use mature ecosystem mutation tools
+instead when they already fit the stack. Full semantics and limits:
+references/evidence-adequacy.md.
+
 ## The Proof Ledger (Meso+ tasks)
 
 A plain markdown table (default `PROOF_LEDGER.md`) where every claim carries
