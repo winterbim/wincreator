@@ -264,7 +264,8 @@ capture separately:
 
 ```
 python3 scripts/wincreator.py review P-014 \
-  --verdict evidenced --reviewer skeptic-01
+  --verdict evidenced --reviewer skeptic-01 \
+  --challenge "attack whether the captured gate is sufficient for the exact claim"
 ```
 
 Review may record `EVIDENCED`, `INSUFFICIENT`, or `DISPROVEN`. `INSUFFICIENT`
@@ -284,7 +285,7 @@ gate. Use `--optional-file` for optional inputs. Protect sensitive output with
 only after the process exits. A Standard capture outside Git warns when it has
 no `--file`, because then no source snapshot is bound to the claim. Read
 `references/attestation.md` and validate the machine schema at
-`schemas/attestation-v1.schema.json` and `schemas/review-v1.schema.json` for
+`schemas/attestation-v1.schema.json`, `schemas/review-v1.schema.json` and `schemas/review-v2.schema.json` for
 Regulated work.
 
 ## Intent convergence before final proof
