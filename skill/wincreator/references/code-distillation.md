@@ -123,11 +123,18 @@ A JSON policy may override only the documented scan controls:
 source_extensions, exclude_dirs, exclude_globs, duplicate_window_lines and
 duplicate_min_chars. Unknown policy keys are rejected.
 
-The default scanner recognizes npm package.json dependencies, Python
-requirements files and common project.dependencies arrays in pyproject.toml,
-plus direct Cargo.toml and go.mod dependencies. When source scope is narrowed,
-manifest discovery still walks the scope's ancestor directories up to the
-declared root, so a root or package-level manifest is not silently dropped. This is intentionally a small
+The default scanner extracts dependency names only from formats it can parse
+without a partial grammar: npm `package.json` and common
+`requirements*.txt` files. `pyproject.toml`, `Cargo.toml` and `go.mod`
+are still discovered and content-fingerprinted, but WinCreator deliberately
+does not maintain home-grown TOML or Go-module parsers. If one of those
+unparsed manifests is added, removed, or changes after the baseline, the result
+is `REVIEW_REQUIRED` rather than a guessed dependency delta. This is
+fail-closed and intentionally trades precision for avoiding false-clean results.
+
+When source scope is narrowed, manifest discovery still walks the scope's
+ancestor directories up to the declared root, so a root or package-level
+manifest is not silently dropped. This is intentionally a small
 direct-dependency surface, not a package-manager replacement.
 
 ## Skeptic questions
@@ -148,7 +155,12 @@ at least these points:
 
 ## Limits
 
-The scanner is deterministic evidence, not an oracle. It does not understand
+The scanner is deterministic evidence, not an oracle. The manifest policy is
+also deliberately conservative: a changed unparsed manifest may be harmless
+configuration rather than dependency growth, but that ambiguity belongs in
+review instead of a fragile parser.
+
+ It does not understand
 domain semantics, prove readability, measure runtime performance, or establish
 global optimality. Exact duplicated windows are intentionally conservative and
 will miss semantic duplication written with different syntax.
