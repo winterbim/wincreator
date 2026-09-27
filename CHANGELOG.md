@@ -28,6 +28,7 @@ history remains available in Git and is not restated here.
   stream-path escape, concurrent stale captures, and historical proof rollback.
 
 ### Fixed
+- Replaced heuristic `pyproject.toml`, `Cargo.toml`, and `go.mod` dependency parsers with content fingerprints that force review on change, eliminating a recurring false-clean parser class instead of patching syntax variants indefinitely.
 - Standard and Regulated reviews now reject Builder/Reviewer identity reuse.
 - CLI review is bound to the claim ID of the selected capture; a capture for a
   different claim cannot be reviewed accidentally or deliberately.
