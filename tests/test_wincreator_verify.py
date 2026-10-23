@@ -74,6 +74,67 @@ def test_verify_rejects_manual_status_change_after_capture(wincreator, ledger, t
     assert any("review" in problem.lower() or "status" in problem.lower() for problem in problems)
 
 
+def test_verify_does_not_fail_on_drift_in_a_superseded_capture(
+    wincreator, ledger, tmp_path
+):
+    old = tmp_path / "old-artifact.txt"
+    old.write_text("old", encoding="utf-8")
+    _first, first_path, _code = prove(wincreator, ledger, tmp_path, files=[str(old)])
+    current = tmp_path / "current-artifact.txt"
+    current.write_text("current", encoding="utf-8")
+    _second, _second_path, _code = prove(wincreator, ledger, tmp_path, files=[str(current)])
+
+    # The ledger now cites the newer capture; the older one is history.
+    old.write_text("changed after the newer capture", encoding="utf-8")
+
+    checked, problems = wincreator.verify_ledger_references(str(ledger))
+    assert checked == 2
+    assert not any(str(first_path) in problem for problem in problems)
+    assert not any("old-artifact.txt" in problem for problem in problems)
+
+
+def test_verify_fails_on_drift_in_the_captured_cited_by_the_ledger(
+    wincreator, ledger, tmp_path
+):
+    artifact = tmp_path / "cited-artifact.txt"
+    artifact.write_text("original", encoding="utf-8")
+    prove(wincreator, ledger, tmp_path, files=[str(artifact)])
+
+    artifact.write_text("changed after capture", encoding="utf-8")
+
+    _checked, problems = wincreator.verify_ledger_references(str(ledger))
+    assert any("cited-artifact.txt" in problem and "changed" in problem for problem in problems)
+
+
+def test_verify_cli_with_a_ledger_ignores_historical_drift(
+    wincreator, ledger, tmp_path, capsys
+):
+    old = tmp_path / "old.txt"
+    old.write_text("old", encoding="utf-8")
+    prove(wincreator, ledger, tmp_path, files=[str(old)])
+    current = tmp_path / "current.txt"
+    current.write_text("current", encoding="utf-8")
+    attestation, path, _code = prove(wincreator, ledger, tmp_path, files=[str(current)])
+    packet = make_challenge_packet(wincreator, attestation, path)
+    wincreator.review_attestation(
+        str(path), verdict="EVIDENCED", reviewer="skeptic-02",
+        challenge="test the cited chain only", challenge_packet=str(packet),
+        ledger=str(ledger)
+    )
+    old.write_text("historical drift", encoding="utf-8")
+
+    code = wincreator.main([
+        "verify",
+        "--ledger",
+        str(ledger),
+        "--attest-dir",
+        str(tmp_path / "attestations"),
+    ])
+    output = capsys.readouterr().out
+    assert code == 0, output
+    assert "historical drift" not in output
+
+
 def test_verify_enforces_schema_even_with_recomputed_digest(wincreator, ledger, tmp_path):
     _attestation, path, _code = prove(wincreator, ledger, tmp_path)
     path = Path(path)

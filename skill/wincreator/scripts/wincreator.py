@@ -1166,6 +1166,26 @@ def _discover_ledger_attestations(ledger_path):
     return matches
 
 
+def _ledger_current_captures(ledger_text, ledger_path):
+    """Captures cited by the evidence of a row that is still current.
+
+    A superseded row keeps its historical capture on disk, but that capture is
+    not the evidence of record any more. Only the cited chains must still match
+    the files as they exist today.
+    """
+    current = set()
+    for _index, cells in _ledger_rows(ledger_text.splitlines()):
+        if len(cells) < 6 or cells[4].strip().upper() == "SUPERSEDED":
+            continue
+        for match in ATTESTATION_REF.finditer(cells[5]):
+            current.add(
+                os.path.realpath(
+                    _resolve_recorded_path(match.group("path"), ledger_path)
+                )
+            )
+    return current
+
+
 def verify_ledger_references(ledger_path):
     problems = []
     checked = 0
@@ -1174,6 +1194,7 @@ def verify_ledger_references(ledger_path):
     except OSError as error:
         return 0, [f"cannot read {ledger_path}: {error}"]
     referenced = [match.group("path") for match in ATTESTATION_REF.finditer(ledger_text)]
+    current_captures = _ledger_current_captures(ledger_text, ledger_path)
     capture_paths = []
     for recorded in referenced:
         capture_paths.append(_resolve_recorded_path(recorded, ledger_path))
@@ -1189,7 +1210,13 @@ def verify_ledger_references(ledger_path):
     verified = []
     for capture_path in unique:
         checked += 1
-        ok, capture_problems = verify_attestation(capture_path)
+        # Historical captures attest the tree as it was at capture time; their
+        # code has legitimately moved on. Keep verifying their document
+        # integrity, but only the cited chain is checked against today's files.
+        is_current = os.path.realpath(capture_path) in current_captures
+        ok, capture_problems = verify_attestation(
+            capture_path, check_artifacts=is_current
+        )
         if not ok:
             problems.extend(f"{capture_path}: {problem}" for problem in capture_problems)
             continue
@@ -1367,7 +1394,10 @@ def cmd_review(args):
 
 def cmd_verify(args):
     targets = list(args.attestations)
-    if not targets and args.attest_dir:
+    # With a ledger, the ledger decides which captures matter. Rescanning the
+    # whole attest dir would fail every historical capture whose code has since
+    # changed, which is not a defect in the current proof.
+    if not targets and args.attest_dir and not args.ledger:
         targets = list(iter_attestations(args.attest_dir))
     all_problems = []
     for path in targets:
