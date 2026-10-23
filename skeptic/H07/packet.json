@@ -1,0 +1,96 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "9b61cf04c06a84d8f106d548095ecce11922b19067c48e28084e75705a85f0cf",
+    "claim": {
+      "id": "H07",
+      "level": "Meso",
+      "text": "the state machine rejects every undeclared transition, contracts are immutable once registered, and the journal detects edits to retained events and deletion of an event that has a successor",
+      "gate": "`python3 -m pytest -q tests/test_harness_contracts.py tests/test_harness_store.py`",
+      "row_sha256": "3d6ab2f1830580e8491b49397f1d78b8d5d0532597629dc9a0bd079e5f21e0a2",
+      "ledger_sha256_before": "cfebe10f04d2c0e3747323a9742d92555b32dde4921d27155d2ccc813f7fe5b4",
+      "status_before": "CLAIMED"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_harness_contracts.py",
+      "tests/test_harness_store.py"
+    ],
+    "stdout": {
+      "sha256": "5a6a4553cb36b890e18f7d6fdd844fe39709300542094f94cc48697666d93cbf",
+      "original_bytes": 99,
+      "stored_bytes": 99,
+      "truncated": false,
+      "body_stored": true,
+      "tail": "...................................                                      [100%]\n35 passed in 0.61s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "harness/contracts.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "b3d97346e5ec95600bb8be098e85e0035c8e49a18558bfba52b06b0841c7d2f6",
+        "bytes": 7669
+      },
+      {
+        "path": "harness/store.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "df9f54a8dfc0e9869c58f853b0850e96691846487b4f6aa4ab3dc3c19954768b",
+        "bytes": 30312
+      },
+      {
+        "path": "harness/journal.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "1361db8a02211aa55dfd95290b1028fcd6ae7642d1082392cca260269e8c8b35",
+        "bytes": 2826
+      },
+      {
+        "path": "tests/test_harness_contracts.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "14b76552d698266b1c9ac55c696d4d9e24adf4a4b89fd1c2a77b2a63922feed9",
+        "bytes": 3184
+      },
+      {
+        "path": "tests/test_harness_store.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "d197b0f2b17da652d3098f0f00221f63524eb063003df66a4ddb9dbe8dcb9cd8",
+        "bytes": 7186
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "1941d12958b287d093bfb55816cd1626458ac6e1",
+      "tree": "e779b08486814490185cb2f7f452f93a88f2fcc9",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "84f9135d6507595a98436a912216c3289ad8b512edb8670c562937e589a1d737",
+      "worktree_digest": "cdb7d179aac2c1d091f501a9e43d32a6dc2c52553482073fca0a84641ccee877"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "51401d82da5e50e773074cb72db0d92256966402a3b0cf057f162d3055b74076"
+}

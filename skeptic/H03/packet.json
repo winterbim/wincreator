@@ -1,0 +1,96 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "8dbbc6b3f495388012930976bbb9bd025b893d81950ff44775ce6e1261b97e3e",
+    "claim": {
+      "id": "H03",
+      "level": "Meso",
+      "text": "the runtime executes gates through the existing proof kernel and refuses SUCCEEDED without an EVIDENCED review",
+      "gate": "`python3 -m pytest -q tests/test_harness_runtime.py tests/test_harness_cli_audit.py`",
+      "row_sha256": "2a6613c56935775d67a9b39f4a0e69b9e60b7e1f5cb728179800b5d500b504c1",
+      "ledger_sha256_before": "10d2d77f5b3f1f7467f3ee6a529863fe3a708b93a5329f21b918d4123571aeb8",
+      "status_before": "CLAIMED"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_harness_runtime.py",
+      "tests/test_harness_cli_audit.py"
+    ],
+    "stdout": {
+      "sha256": "dd3c92a9fd83caadd95417541ec819144207ab1d21a45aba639a29c7dbe80eed",
+      "original_bytes": 99,
+      "stored_bytes": 99,
+      "truncated": false,
+      "body_stored": true,
+      "tail": "...................                                                      [100%]\n19 passed in 2.54s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "harness/runtime.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "7c999fcc6525e2d6e4d7024b4984542b7b98605626349050603fb27162fae0f3",
+        "bytes": 16842
+      },
+      {
+        "path": "harness/kernel.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "df690b3c41b1afe836289599118656aea8ec52e1466e848e26336b032f270843",
+        "bytes": 6992
+      },
+      {
+        "path": "harness/cli.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "eb23bdda55f2163fd946517fef97ba6bd6257815c5414624e2b1a52a648236dd",
+        "bytes": 14383
+      },
+      {
+        "path": "tests/test_harness_runtime.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "2822b1daae23d4aa67e92eb08176a7e32569afab06ac3c7827ee8916691e6f25",
+        "bytes": 8475
+      },
+      {
+        "path": "tests/test_harness_cli_audit.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "30a20adff1811a55c59d1b25afbfa4fe1197bcd83d9c3d788257b1860a0db789",
+        "bytes": 3993
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "1941d12958b287d093bfb55816cd1626458ac6e1",
+      "tree": "e779b08486814490185cb2f7f452f93a88f2fcc9",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "f34613a73d8acf605a6b1cb2873483ee4e39c52bb4266e47a159f214431615a3",
+      "worktree_digest": "6ca9426b020d66a0dcad11b88228f690661aaa8af65c4f307fe91c316215a3c6"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "283c8bbc337bff35866742ab39a62c3a05d70379d9117cc4aab04b780db67c5e"
+}
