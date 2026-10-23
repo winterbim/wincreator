@@ -50,6 +50,13 @@ def migration_tool():
 
 
 @pytest.fixture(scope="session")
+def veor_provision():
+    return load_module(
+        "veor_provision_under_test", REPO / "tools" / "veor_provision.py"
+    )
+
+
+@pytest.fixture(scope="session")
 def release_policy():
     return load_module("release_policy_under_test", REPO / "tools" / "release_policy.py")
 
