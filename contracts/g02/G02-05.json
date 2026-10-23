@@ -1,0 +1,19 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-05",
+  "name": "A governed run executes only under a verified ALLOW and a bound receipt",
+  "claim": "a governed task refuses to execute on DENY, on REVIEW without a consumed one-shot approval, on an unavailable or lying sidecar and when no receipt can be verified, and every executed capture is bound to a signed receipt that verify re-checks",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "-m", "pytest", "-q", "tests/test_governed.py"],
+    "files": [
+      "harness/governed.py",
+      "harness/governance.py",
+      "harness/runtime.py",
+      "tests/test_governed.py"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}

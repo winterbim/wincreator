@@ -1,0 +1,17 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-03",
+  "name": "VEOR receipts are verified by their own verifier before binding",
+  "claim": "a receipt only counts after VEOR's offline verifier exits zero with ok=true, digest and signature checks; a capture binding digest is deterministic over attestation digest, exit code and stream hashes",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "-m", "pytest", "-q", "tests/test_governance.py", "-k", "receipt or bind"],
+    "files": [
+      "harness/governance.py",
+      "tests/test_governance.py"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}

@@ -1,0 +1,69 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "1e60559716cc024af492c75e81933cfca93a0724771b80913673971006c2a476",
+    "claim": {
+      "id": "H01",
+      "level": "Meso",
+      "text": "the G00 audit re-derives the repository baseline and every reference gate it executes passes",
+      "gate": "`python3 -m harness audit --out .harness-artifacts/g00-audit-final.json --quiet`",
+      "row_sha256": "8832b0895f7629af0e76e06c52d5e938243a866174f057152b03776431ce42aa",
+      "ledger_sha256_before": "205eb747e11eb886337bc9cf2c0beb268f2baedb443f3f05f1885ae6514f02b5",
+      "status_before": "PENDING"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "harness",
+      "audit",
+      "--out",
+      ".harness-artifacts/g00-audit-final.json",
+      "--quiet"
+    ],
+    "stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "harness/audit.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "5f6081b9b34de3265759ca63a2ae9bf9776c47d90b9d8e50bd4d24c8d5bb62d2",
+        "bytes": 9676
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "c4176711a8fc8562d814b55dc8fa8c8ba87d24bb",
+      "tree": "dbed0b1bd03765496bc19802cbb6c41dfe9adcd0",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": false,
+      "submodules": "",
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "42b55aa04f3663591fcbd707bd0a378a10bef825b2b39eef316bd917f6edde86"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "19ec3422bb53ce8683c942b3b68e8f3bc33667cd1435d12d958f01c1d34a06dd"
+}

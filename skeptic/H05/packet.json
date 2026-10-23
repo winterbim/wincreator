@@ -1,0 +1,58 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "bc1ca811146f0d4c29856e20260ce7a22464fdd9664a925c2403a56ad9a4841e",
+    "claim": {
+      "id": "H05",
+      "level": "Meso",
+      "text": "the change introduces no regression in the existing WinCreator test suite",
+      "gate": "`python3 -m pytest -q`",
+      "row_sha256": "6cc1ee6e3d11536f3f6e0934c43f386e29267fc8ea4468aded8bc1f7e6922bdd",
+      "ledger_sha256_before": "6d958ccdd56bd470012db071cb1c65face5b5e35af54641c7c9792e5362306be",
+      "status_before": "PENDING"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "stdout": {
+      "sha256": "a422d7680bba19e83a0e3a6d735ac46e77494858bfeae677b322c85280cc18f6",
+      "original_bytes": 341,
+      "stored_bytes": 341,
+      "truncated": false,
+      "body_stored": true,
+      "tail": "........................................................................ [ 30%]\n........................................................................ [ 60%]\n........................................................................ [ 91%]\n.....................                                                    [100%]\n237 passed in 12.57s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [],
+    "git": {
+      "available": true,
+      "commit": "c4176711a8fc8562d814b55dc8fa8c8ba87d24bb",
+      "tree": "dbed0b1bd03765496bc19802cbb6c41dfe9adcd0",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "3bee6c121afff26fb058c2516895f26b0623157bfbfd612e05d8e76b42768daf"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "f881d6c007f6b8ba8f28ec0ff4cbe5264364eb7244b491ff579a9f1ba37fb5be"
+}

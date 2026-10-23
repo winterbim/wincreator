@@ -1,0 +1,81 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "6cf2561b6a4ec8e272ff3b6fec8a8bbf040ca7eff013a99e2d8441b4dd5ba9f1",
+    "claim": {
+      "id": "G02-05",
+      "level": "Meso",
+      "text": "a governed run executes only under a verified ALLOW and a bound receipt",
+      "gate": "`python3 -m pytest -q tests/test_governed.py`",
+      "row_sha256": "98a1fe856c030260d52cbc86608797726ef0bc8206bb63ddde5acebd03ae724d",
+      "ledger_sha256_before": "1d4c3746f133905399b618066d0e792f60a7ce44d878a827a8d23b1edea94764",
+      "status_before": "PENDING"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_governed.py"
+    ],
+    "stdout": {
+      "sha256": "71564ccfdf82e9cd8a40a0f0ea44501dd062ff98be0f8a4de455e31a3da36874",
+      "original_bytes": 99,
+      "stored_bytes": 99,
+      "truncated": false,
+      "body_stored": true,
+      "tail": "........................                                                 [100%]\n24 passed in 2.18s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "harness/governed.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "f2abe7523b373dbf618a3bf3f55f57007f23699cd1503b0edcdd923f15285428",
+        "bytes": 25713
+      },
+      {
+        "path": "harness/runtime.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "0ecfa439e7e2319748291a0aca9defcc9bf801fb19de423a197a2875fcfd88ba",
+        "bytes": 21226
+      },
+      {
+        "path": "tests/test_governed.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "a1a364b9b12392eb6304fd5ad75c3628cd42c6ca3bee6fcb694510e88537aa2f",
+        "bytes": 25302
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "c4176711a8fc8562d814b55dc8fa8c8ba87d24bb",
+      "tree": "dbed0b1bd03765496bc19802cbb6c41dfe9adcd0",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "5a1154399773bf47ea4548fa7b89703673ed3e4dd714f17cbf109fd57b1e47ae"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "4f9d3a23d6348ec40557e36532f8f11256de0a9da71fd2092f38962f695fed13"
+}

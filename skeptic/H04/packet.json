@@ -1,0 +1,81 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "aa3ead4771a85d0ea6d65a6bdfc523dbac088641ba9db64f5f4736a4be77b284",
+    "claim": {
+      "id": "H04",
+      "level": "Meso",
+      "text": "a runtime killed mid-gate is recovered by resume with an abandoned attempt, a retry and a clean journal",
+      "gate": "`python3 -m pytest -q tests/test_harness_crash.py`",
+      "row_sha256": "5dc674af1c31a35d68afcc61f559b93ae2f14c8c578865bf5d41cf56b0a22b8c",
+      "ledger_sha256_before": "8179b28f45e45907a1b1f090d6aceaf8e6be371f9c52e56cf27588cd45a3cbed",
+      "status_before": "PENDING"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_harness_crash.py"
+    ],
+    "stdout": {
+      "sha256": "016a4093788648644b08006f7d1d171ca7639313677f5aa929f004d4a3e52465",
+      "original_bytes": 98,
+      "stored_bytes": 98,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ".                                                                        [100%]\n1 passed in 0.22s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "harness/runtime.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "0ecfa439e7e2319748291a0aca9defcc9bf801fb19de423a197a2875fcfd88ba",
+        "bytes": 21226
+      },
+      {
+        "path": "harness/store.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "a6abe5160251f288b7a2c3fa6c64bf53f816e2cfce9df6682103b427b1b3ce36",
+        "bytes": 30998
+      },
+      {
+        "path": "tests/test_harness_crash.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "eec09d5701f1167c5e0d859f569269e2e6462f4c692be6e39f3ca2b58575d68e",
+        "bytes": 2747
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "2f4eb4a72b32ab6afca4085a6f810a2accb914cc",
+      "tree": "12e9eeffbca551506e0e4ff1e3862d0b2aa4c880",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "155b868198e018fc4896ccada74af222f631f0056530f626ca8e0a11cfe5290f"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "15c106c7427ce6ad34b8950d8ea176019007f449be939f537696e324618029be"
+}

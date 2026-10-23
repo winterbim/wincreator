@@ -1,0 +1,17 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-02",
+  "name": "Malformed or unavailable governance never yields ALLOW",
+  "claim": "every sidecar failure mode (spawn error, exit code, bad JSON, unknown decision, malformed reasons, missing policy digest) raises GovernanceUnavailable instead of an allow",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "-m", "pytest", "-q", "tests/test_governance.py", "-k", "sidecar or decision"],
+    "files": [
+      "harness/governance.py",
+      "tests/test_governance.py"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}

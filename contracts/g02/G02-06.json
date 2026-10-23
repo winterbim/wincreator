@@ -1,0 +1,20 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-06",
+  "name": "The governed path works against the real pinned VEOR checkout",
+  "claim": "with VEOR at the pinned commit, a REVIEW blocks execution, an operator-signed one-shot approval produces an ALLOW whose Ed25519 receipt VEOR's own verifier accepts, and a replayed approval or a receipt bound to another capture is refused",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "tools/veor_gate.py"],
+    "files": [
+      "tests/test_g02_integration.py",
+      "tools/veor_gate.py",
+      "tools/veor-pin.json",
+      "harness/governed.py",
+      "docs/adr/0005-governed-execution-order.md"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}

@@ -11,6 +11,10 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 SKILL = REPO / "skill" / "wincreator"
 
+# The harness runtime is a repository-local package, not an installed one.
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
 
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -43,6 +47,13 @@ def package_builder():
 @pytest.fixture(scope="session")
 def migration_tool():
     return load_module("migration_tool_under_test", REPO / "tools" / "migrate_v2_to_v3.py")
+
+
+@pytest.fixture(scope="session")
+def veor_provision():
+    return load_module(
+        "veor_provision_under_test", REPO / "tools" / "veor_provision.py"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -104,6 +115,56 @@ def prove(wincreator, ledger, tmp_path, command=None, **kwargs):
         tier=kwargs.pop("tier", "standard"),
         **kwargs,
     )
+
+
+def harness_contract(
+    task_id="H1",
+    name="harness task",
+    claim="the harness gate executes and is captured",
+    level="Micro",
+    tier="lite",
+    command=None,
+    max_attempts=3,
+    require_review=None,
+    files=(),
+    optional_files=(),
+    timeout=None,
+):
+    from harness.contracts import GateSpec, TaskContract
+
+    return TaskContract(
+        task_id=task_id,
+        name=name,
+        claim=claim,
+        level=level,
+        tier=tier,
+        gate=GateSpec(
+            command=tuple(command or [sys.executable, "-c", "print('gate ok')"]),
+            timeout_seconds=timeout,
+            files=tuple(files),
+            optional_files=tuple(optional_files),
+        ),
+        max_attempts=max_attempts,
+        require_review=require_review,
+    )
+
+
+@pytest.fixture
+def harness_store(tmp_path):
+    from harness.store import Store
+
+    store = Store(str(tmp_path))
+    store.initialize()
+    return store
+
+
+@pytest.fixture
+def harness_executor(tmp_path):
+    from harness.runtime import Executor
+
+    executor = Executor(str(tmp_path), builder="builder-01", quiet=True)
+    executor.initialize()
+    return executor
 
 
 def make_challenge_packet(wincreator, attestation, attestation_path):
