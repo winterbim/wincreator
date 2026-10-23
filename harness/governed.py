@@ -415,12 +415,18 @@ def run(executor, task_id, config, advisory="ALLOW", retry_reason=None):
         timeout=config.timeout,
         env=config.sidecar_env,
     )
-    decision = sidecar.decide(
-        effect["tool"],
-        dict(effect["args"]),
-        annotations=dict(GATE_ANNOTATIONS),
-        advisory=advisory,
-    )
+    try:
+        decision = sidecar.decide(
+            effect["tool"],
+            dict(effect["args"]),
+            annotations=dict(GATE_ANNOTATIONS),
+            advisory=advisory,
+        )
+    except governance.GovernanceUnavailable as error:
+        # A timeout, a malformed answer or a dead sidecar is a refusal, not a
+        # crash to be retried: record it so the journal says why nothing ran.
+        _block(store, task_id, "GOVERNANCE_UNAVAILABLE", [str(error)])
+        raise
     record = decision.raw.get("record")
     if decision.decision != "ALLOW":
         _block(

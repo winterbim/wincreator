@@ -3,11 +3,18 @@
 These use a fake decision kernel: they prove what the *harness* does with an
 answer, including every refusal. The real pinned VEOR sidecar, its Ed25519
 receipts and its offline verifier are exercised in ``test_g02_integration.py``.
+
+Two protocol-failure tests run a deliberately broken Node entrypoint through
+the real ``Sidecar`` process plumbing (a real timeout, a real malformed line).
+They prove the client's refusal, not VEOR's behaviour, and are not evidence of
+integration with VEOR.
 """
 
 import json
 import os
+import shutil
 import sys
+import time
 import uuid
 
 import pytest
@@ -38,6 +45,38 @@ def _checkout(tmp_path, version="0.4.0-dev.6"):
         ["git", "rev-parse", "HEAD"], cwd=home, capture_output=True, text=True, check=True
     ).stdout.strip()
     return home, commit
+
+
+def _sidecar_checkout(tmp_path, script):
+    """A clean checkout whose committed entrypoint deliberately misbehaves."""
+    import subprocess
+
+    home, _commit = _checkout(tmp_path)
+    (home / "src" / "kernel" / "stdio.js").write_text(script, encoding="utf-8")
+    identity = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+    subprocess.run(
+        ["git", *identity, "commit", "-qam", "misbehaving sidecar"],
+        cwd=home,
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=home, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    return home, commit
+
+
+def _sidecar_config(tmp_path, script, timeout=60):
+    home, commit = _sidecar_checkout(tmp_path, script)
+    pin_path = _pin(tmp_path, home, commit)
+    key = tmp_path / "receipt.pub.pem"
+    key.write_text("x", encoding="utf-8")
+    return governed.GovernanceConfig.for_root(
+        tmp_path,
+        pin=str(pin_path),
+        home=str(home),
+        receipt_public_key=str(key),
+        timeout=timeout,
+    )
 
 
 def _pin(tmp_path, home, commit):
@@ -218,6 +257,83 @@ def test_unavailable_governance_executes_nothing(harness_executor, tmp_path, mon
 
     assert harness_executor.store.latest_proof("H1") is None
     assert harness_executor.store.events("H1")[-1]["payload"]["code"] == "GOVERNANCE_BLOCKED"
+
+
+requires_node = pytest.mark.skipif(
+    shutil.which("node") is None,
+    reason="the sidecar protocol tests need a Node.js runtime",
+)
+
+
+@requires_node
+def test_a_timed_out_sidecar_executes_nothing(harness_executor, tmp_path):
+    config = _sidecar_config(
+        tmp_path, "setTimeout(() => process.exit(0), 30000);\n", timeout=0.4
+    )
+    harness_executor.register(harness_contract(tier="lite"))
+
+    started = time.monotonic()
+    with pytest.raises(GovernanceUnavailable, match="cannot run VEOR sidecar"):
+        governed.run(harness_executor, "H1", config)
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 20, "the client must give up on its own timeout"
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.get_task("H1").state == "PENDING"
+    events = harness_executor.store.events("H1")
+    assert events[-1]["payload"]["code"] == "GOVERNANCE_UNAVAILABLE"
+    assert not any(event["type"].startswith("attempt") for event in events)
+
+
+@requires_node
+def test_a_malformed_sidecar_response_executes_nothing(harness_executor, tmp_path):
+    config = _sidecar_config(
+        tmp_path, 'process.stdout.write("not a json line\\n");\n'
+    )
+    harness_executor.register(harness_contract(tier="lite"))
+
+    with pytest.raises(GovernanceUnavailable, match="no matching JSON response"):
+        governed.run(harness_executor, "H1", config)
+
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.get_task("H1").state == "PENDING"
+    assert harness_executor.store.events("H1")[-1]["payload"]["code"] == (
+        "GOVERNANCE_UNAVAILABLE"
+    )
+
+
+def test_a_modified_checkout_with_the_pinned_head_executes_nothing(
+    harness_executor, tmp_path, monkeypatch
+):
+    import subprocess
+
+    home, commit = _checkout(tmp_path)
+    pin_path = _pin(tmp_path, home, commit)
+    key = tmp_path / "receipt.pub.pem"
+    key.write_text("x", encoding="utf-8")
+    config = governed.GovernanceConfig.for_root(
+        tmp_path, pin=str(pin_path), home=str(home), receipt_public_key=str(key)
+    )
+    monkeypatch.setattr(governance, "node_version", lambda: "v22.3.0")
+    harness_executor.register(harness_contract(tier="lite"))
+
+    # Same commit, different code: HEAD cannot prove what would run.
+    (home / "src" / "kernel" / "stdio.js").write_text(
+        "// patched after the pin\n", encoding="utf-8"
+    )
+
+    with pytest.raises(GovernanceUnavailable, match="local modifications"):
+        governed.run(harness_executor, "H1", config)
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=home, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert head == commit
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.get_task("H1").state == "PENDING"
+    assert harness_executor.store.events("H1")[-1]["payload"]["code"] == (
+        "GOVERNANCE_BLOCKED"
+    )
 
 
 def test_missing_receipt_key_executes_nothing(harness_executor, veor_env, tmp_path):
