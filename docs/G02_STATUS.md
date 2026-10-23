@@ -18,7 +18,7 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 | Reproducible pin | `tools/veor-pin.json` (commit `87a6fb3`, package `0.4.0-dev.6`, Node ≥ 22) |
 | Provisioning check + self-test (10 checks, incl. dirty checkout) | `tools/veor_check.py` |
 | Gate wrapper that fails instead of skipping when VEOR is absent | `tools/veor_gate.py` |
-| Hermetic adversarial suite (16 tests) | `tests/test_governed.py` |
+| Hermetic adversarial suite (18 tests) | `tests/test_governed.py` |
 | Real-VEOR integration suite (7 tests) | `tests/test_g02_integration.py` |
 | ADRs | `docs/adr/0001`–`0005` |
 
@@ -29,7 +29,8 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 - `python3 tools/veor_check.py` → `READY`, exit 0.
 - `python3 tools/veor_check.py --self-test` → **10/10**.
 - `python3 tools/veor_gate.py` (real sidecar, real Ed25519 keys) → **7/7 pass**.
-- Full suite with `VEOR_HOME` set → **221 passed**.
+- Full suite with `VEOR_HOME` set → **223 passed**; without it → 216 passed,
+  7 skipped (the integration module skips rather than pretending).
 - What the integration suite actually proves:
   - `REVIEW` blocks execution, the challenge is journaled, nothing runs;
   - an operator-signed one-shot approval turns the same effect into `ALLOW`;

@@ -1,11 +1,16 @@
-# Proof ledger — harness runtime (G00 + G01, G02 preparation)
+# Proof ledger — harness runtime (G00 + G01, G02)
 
 Claims shipped by the harness-runtime delivery on `feat/harness-runtime-v1`.
 
-Captures are produced by `wincreator prove` at commit `1941d12`; no verdict is
-written by the Builder. Reviews must be recorded by an independent Skeptic, one
-per dossier under `skeptic/`. Attestations are retained locally under
+Captures are produced by `wincreator prove`; no verdict is written by the
+Builder. Reviews must be recorded by an independent Skeptic, one per dossier
+under `skeptic/`. Attestations are retained locally under
 `.wincreator/attestations/` (gitignored, same policy as the other ledgers here).
+
+Capture commits: H01–H07 at `1941d12`, G02-05 at `0022d27`, G02-06 at `83b7868`.
+H03/H04/H07 attest the runtime files as they were at `1941d12`; this delivery
+changed those files, so `wincreator verify` reports the drift. Their dossiers are
+reviewable against `1941d12` only, and the rows stay PENDING either way.
 
 | ID | Level | Claim | Gate (what proves it) | Status | Evidence |
 |----|-------|-------|------------------------|--------|----------|
@@ -18,4 +23,4 @@ per dossier under `skeptic/`. Attestations are retained locally under
 | H07 | Meso | the state machine rejects every undeclared transition, contracts are immutable once registered, and the journal detects edits to retained events and deletion of an event that has a successor | `python3 -m pytest -q tests/test_harness_contracts.py tests/test_harness_store.py` | PENDING | wincreator capture 2026-10-23T21:54:55.087565Z: `python3 -m pytest -q tests/test_harness_contracts.py tests/test_harness_store.py` -> CAPTURED_PASS exit=0 (871 ms); claim_sha256=3d6ab2f1830580e8491b49397f1d78b8d5d0532597629dc9a0bd079e5f21e0a2; attestation .wincreator/attestations/H07/20261023T215455.087077Z-19a2219a-ca76-4755-9193-75a3dd1c4678/attestation.json sha256=9b61cf04c06a84d8f106d548095ecce11922b19067c48e28084e75705a85f0cf |
 | G02-01 | Meso | the optional VEOR governance sidecar is integrated fail-closed and provable end to end | `python3 -m pytest -q tests/test_governance.py` | BLOCKED | blocked by independent Skeptic review of H01/H03/H04/H05/H07; the provisioning blocker is cleared since 2026-10-24 (checkout at 87a6fb3 reports READY), so only review remains |
 | G02-05 | Meso | a governed run executes only under a verified ALLOW and a bound receipt | `python3 -m pytest -q tests/test_governed.py` | PENDING | wincreator capture 2026-10-23T22:29:36.389111Z: `python3 -m pytest -q tests/test_governed.py` -> CAPTURED_PASS exit=0 (1810 ms); claim_sha256=98a1fe856c030260d52cbc86608797726ef0bc8206bb63ddde5acebd03ae724d; attestation .wincreator/attestations/G02-05/20261023T222936.387932Z-608b7b38-eaa9-4229-b630-a12198741ea9/attestation.json sha256=cf28c0889d300db224514f755dbd5dbcbaaaf44684e509e347e328d8788cf32d |
-| G02-06 | Meso | the governed path works against the real pinned VEOR checkout | `python3 tools/veor_gate.py` | PENDING | wincreator capture 2026-10-23T22:29:52.642426Z: `python3 tools/veor_gate.py` -> CAPTURED_PASS exit=0 (3847 ms); claim_sha256=5425c074ad515f899a080c97f59c2f4b3ebec3f5e0956f14073f53d24a20eeb9; attestation .wincreator/attestations/G02-06/20261023T222952.642220Z-61dd0b8b-0a52-4147-8ace-1e27306838ba/attestation.json sha256=26a87e917069d5cb2550430419f933d66769f84e167445a832c6598672a3f9f9 |
+| G02-06 | Meso | the governed path works against the real pinned VEOR checkout | `python3 tools/veor_gate.py` | PENDING | wincreator capture 2026-10-23T22:30:43.542949Z: `python3 tools/veor_gate.py` -> CAPTURED_PASS exit=0 (3152 ms); claim_sha256=5425c074ad515f899a080c97f59c2f4b3ebec3f5e0956f14073f53d24a20eeb9; attestation .wincreator/attestations/G02-06/20261023T223043.540215Z-fcb87e6f-580a-4b65-ad9d-10504a3ded11/attestation.json sha256=3540e98929ca0d407f9ad0e28fe32c3c9fba6c1aa42213e0ee4d1c8a42a9e00e |
