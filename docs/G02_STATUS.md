@@ -18,7 +18,7 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 | Reproducible pin | `tools/veor-pin.json` (commit `87a6fb3`, package `0.4.0-dev.6`, Node ≥ 22) |
 | Provisioning check + self-test (10 checks, incl. dirty checkout) | `tools/veor_check.py` |
 | Gate wrapper that fails instead of skipping when VEOR is absent | `tools/veor_gate.py` |
-| Hermetic adversarial suite (18 tests) | `tests/test_governed.py` |
+| Hermetic adversarial suite (21 tests) | `tests/test_governed.py` |
 | Real-VEOR integration suite (7 tests) | `tests/test_g02_integration.py` |
 | ADRs | `docs/adr/0001`–`0005` |
 
@@ -29,8 +29,14 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 - `python3 tools/veor_check.py` → `READY`, exit 0.
 - `python3 tools/veor_check.py --self-test` → **10/10**.
 - `python3 tools/veor_gate.py` (real sidecar, real Ed25519 keys) → **7/7 pass**.
-- Full suite with `VEOR_HOME` set → **223 passed**; without it → 216 passed,
+- Full suite with `VEOR_HOME` set → **227 passed**; without it → 220 passed,
   7 skipped (the integration module skips rather than pretending).
+- Fresh captures at `3167651472a639decf49ac17b835b21395e044e9` for H01, H03, H04,
+  H05, H07, G02-05 and G02-06: all `CAPTURED_PASS`, exit 0. `ledger_check.py`
+  reports `CLEAN`; `wincreator verify` reports **no file drift on the current
+  rows** and still fails on the seven `PENDING` rows (a passing gate is not a
+  verdict). Older captures retained on disk report drift because the code they
+  bound has since changed.
 - What the integration suite actually proves:
   - `REVIEW` blocks execution, the challenge is journaled, nothing runs;
   - an operator-signed one-shot approval turns the same effect into `ALLOW`;
@@ -43,6 +49,13 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
     is refused by the harness (`RESULT_DIGEST_MISMATCH`);
   - the decision artifact carries no raw arguments (no secret leakage into the
     governance artifacts), only `argsDigest`.
+- What the hermetic suite proves about the refusals, including the paths added
+  in this delivery:
+  - a real sidecar **timeout** and a real **malformed** stdout line both end the
+    run with `GOVERNANCE_UNAVAILABLE` journaled and no attempt started;
+  - a checkout whose **HEAD still matches the pin but whose entrypoint was
+    modified** is refused before the decision (`GOVERNANCE_BLOCKED`,
+    `local modifications`) — HEAD alone is not treated as integrity.
 
 ## Deliberately not claimed
 
