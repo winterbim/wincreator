@@ -50,6 +50,21 @@ def portable_path(path):
     return os.fspath(path).replace("\\", "/")
 
 
+def atomic_write_json(path, document):
+    """Write JSON at mode 0600 through a same-directory temporary file."""
+    path = os.path.abspath(path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    temporary = f"{path}.{os.getpid()}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(document, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+    return path
+
+
 def pid_alive(pid):
     """Best-effort liveness probe for a run owner.
 

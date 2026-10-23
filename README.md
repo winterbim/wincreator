@@ -273,9 +273,20 @@ python3 -m harness governance     # exit 3 while no pinned VEOR checkout exists
 python3 tools/veor_check.py       # same check, same exit code
 ```
 
+With a pinned VEOR checkout provisioned through `VEOR_HOME`, a task can run
+through the governed path instead: VEOR decides before the gate starts, the
+decision is hashed into the capture, and a signed Ed25519 receipt is accepted
+only after VEOR's own offline verifier confirms it binds that exact capture.
+
+```bash
+python3 -m harness run-governed H1     # no execution on DENY / unapproved REVIEW
+python3 -m harness verify              # re-verifies receipts, not just captures
+```
+
 Governance never decides proof status. [`docs/VEOR_GUARDIAN_AUDIT.md`](docs/VEOR_GUARDIAN_AUDIT.md)
-records the executed VEOR audit, [`docs/G02_STATUS.md`](docs/G02_STATUS.md) the
-PARTIAL/BLOCKED status, and [`docs/adr/`](docs/adr/) the four decisions behind it.
+records the executed VEOR audit, [`docs/G02_STATUS.md`](docs/G02_STATUS.md) what
+is exercised and what is not claimed, and [`docs/adr/`](docs/adr/) the five
+decisions behind it.
 
 ## Public ON/OFF benchmark
 

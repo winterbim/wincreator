@@ -140,13 +140,20 @@ def ensure_claim(ledger_path, contract: TaskContract):
     return str(path)
 
 
-def capture(contract: TaskContract, ledger_path, attest_dir, workspace, builder=None):
+def capture(
+    contract: TaskContract,
+    ledger_path,
+    attest_dir,
+    workspace,
+    builder=None,
+    extra_files=(),
+):
     api = kernel()
     return api.run_and_attest(
         contract.task_id,
         list(contract.gate.command),
         ledger=ledger_path,
-        files=list(contract.gate.files),
+        files=list(contract.gate.files) + list(extra_files),
         optional_files=list(contract.gate.optional_files),
         attest_dir=attest_dir,
         cwd=workspace,

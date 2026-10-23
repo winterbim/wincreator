@@ -5,6 +5,7 @@ Usage:
     python3 -m harness add --id H02 --name "..." --claim "..." --level Meso \
         --tier standard -- python3 -m pytest -q tests/test_x.py
     python3 -m harness run H02
+    python3 -m harness run-governed H02 --receipt-public-key FILE
     python3 -m harness resume
     python3 -m harness review H02 --verdict evidenced --reviewer skeptic-01 \
         --challenge "attack whether ..."
@@ -132,6 +133,63 @@ def cmd_run(args):
     return _result_exit_code(results)
 
 
+def cmd_run_governed(args):
+    from harness import governed
+
+    executor = Executor(
+        args.root, builder=args.builder, lease_seconds=args.lease_seconds
+    )
+    executor.store.ensure_initialized()
+    config = governed.GovernanceConfig.for_root(
+        args.root,
+        pin=args.pin,
+        home=args.home,
+        node=args.node,
+        receipt_public_key=args.receipt_public_key,
+        timeout=args.timeout,
+    )
+    task_ids = list(args.task_ids)
+    if not task_ids:
+        if not args.all:
+            print("ERROR: name task ids or pass --all", file=sys.stderr)
+            return 2
+        task_ids = [
+            task.task_id for task in executor.store.list_tasks(state="READY")
+        ]
+    results = []
+    for task_id in task_ids:
+        try:
+            results.append(
+                governed.run(
+                    executor,
+                    task_id,
+                    config,
+                    advisory=args.advisory,
+                    retry_reason=args.retry_reason,
+                )
+            )
+        except governed.GovernanceDenied as error:
+            print(f"  [BLOCKED] {task_id} {error}")
+            return 1
+        except governed.governance.GovernanceUnavailable as error:
+            print(f"  [BLOCKED] {task_id} governance: {error}")
+            return 1
+    _print_results(results)
+    for result in results:
+        summary = result.get("governance")
+        if not summary:
+            continue
+        print(
+            f"      [GOVERNED] receipt={summary['receipt_id']} "
+            f"binding={summary['binding_digest'][:12]} "
+            f"signature={summary['checks'].get('signature')}"
+        )
+    if not results:
+        print("[GOVERNED] no task to run")
+        return 0
+    return _result_exit_code(results)
+
+
 def cmd_resume(args):
     executor = Executor(
         args.root, builder=args.builder, lease_seconds=args.lease_seconds
@@ -189,9 +247,20 @@ def cmd_status(args):
 
 
 def cmd_verify(args):
+    from harness import governed
+
     executor = Executor(args.root, builder=args.builder)
     executor.store.ensure_initialized()
-    problems, summary = executor.verify(require_complete=args.require_complete)
+    config = governed.GovernanceConfig.for_root(
+        args.root,
+        pin=args.pin,
+        home=args.home,
+        node=args.node,
+        receipt_public_key=args.receipt_public_key,
+    )
+    problems, summary = executor.verify(
+        require_complete=args.require_complete, governance_config=config
+    )
     print(
         f"[VERIFY] tasks={summary['tasks']} succeeded={summary['succeeded']} "
         f"proofs={summary['proofs']}"
@@ -317,6 +386,26 @@ def build_parser():
     run.add_argument("--lease-seconds", type=float, default=900)
     run.set_defaults(func=cmd_run)
 
+    run_governed = subparsers.add_parser(
+        "run-governed",
+        help="execute READY tasks only after a VEOR decision and a verified receipt",
+    )
+    run_governed.add_argument("task_ids", nargs="*")
+    run_governed.add_argument("--all", action="store_true")
+    run_governed.add_argument("--lease-seconds", type=float, default=900)
+    run_governed.add_argument("--pin", default=None)
+    run_governed.add_argument("--home", default=None)
+    run_governed.add_argument("--node", default=None)
+    run_governed.add_argument(
+        "--receipt-public-key", dest="receipt_public_key", default=None
+    )
+    run_governed.add_argument("--timeout", type=float, default=60.0)
+    run_governed.add_argument(
+        "--advisory", default="ALLOW", choices=("ALLOW", "REVIEW", "DENY")
+    )
+    run_governed.add_argument("--retry-reason", dest="retry_reason", default=None)
+    run_governed.set_defaults(func=cmd_run_governed)
+
     resume = subparsers.add_parser("resume", help="recover interrupted work and continue")
     resume.add_argument("task_ids", nargs="*")
     resume.add_argument("--no-retry", action="store_true")
@@ -343,6 +432,10 @@ def build_parser():
 
     verify = subparsers.add_parser("verify", help="re-verify proofs, journal and ledger")
     verify.add_argument("--require-complete", action="store_true")
+    verify.add_argument("--pin", default=None, help="VEOR pin (governed tasks)")
+    verify.add_argument("--home", default=None, help="pinned VEOR checkout")
+    verify.add_argument("--node", default=None)
+    verify.add_argument("--receipt-public-key", dest="receipt_public_key", default=None)
     verify.set_defaults(func=cmd_verify)
 
     gov = subparsers.add_parser(

@@ -162,6 +162,49 @@ reference gates (`compileall`, the embedded adversarial suites, `pytest`). Any
 failing gate fails the audit. The Markdown file is a snapshot, not a standing
 claim: regenerate it.
 
+## Governed execution (G02, optional)
+
+When a pinned VEOR sidecar is provisioned, a task can be executed through the
+governance path instead of the plain one:
+
+```bash
+export VEOR_HOME=/path/to/veor-at-pinned-commit
+export VEOR_RECEIPT_PUBLIC_KEY=/secure/veor-receipt.pub.pem
+export VEOR_POLICY=/secure/wincreator.policy.json
+export VEOR_RUNTIME_DIR=/secure/veor-state
+export VEOR_APPROVAL_PUBLIC_KEY=/secure/veor-approval.pub.pem
+# VEOR_RECEIPT_PRIVATE_KEY is read by the VEOR process only
+
+python3 tools/veor_check.py                      # 0 READY, 3 BLOCKED
+python3 -m harness run-governed G02-01
+python3 -m harness verify --require-complete     # re-verifies receipts too
+```
+
+The order is the guarantee, and each step refuses to skip the previous one:
+
+1. the pin, package version, git HEAD, dirty state, entrypoint and Node floor
+   must match, or nothing runs;
+2. VEOR decides on the proposed effect (`wincreator.gate.execute` with the
+   contract digest and gate command); `DENY`, `REVIEW` without a consumed
+   one-shot approval, a timeout or a malformed answer ends the run with a
+   journaled `governance_blocked` event and no gate execution;
+3. the decision is written as `governance-decision.json` and passed to the
+   kernel as a hashed input, so the attestation commits to the authorization
+   that preceded it;
+4. the gate runs through the proof kernel exactly as an ungoverned task would;
+5. VEOR signs an Ed25519 receipt binding tool, args digest, policy digest,
+   decision and a digest of the capture (attestation digest, exit code, stream
+   hashes); the receipt is accepted only after VEOR's own verifier exits zero
+   with `ok=true`, digest and signature checks, and every bound field matches;
+6. the verified receipt is journaled as a `governance_bound` event. It never
+   writes a ledger status or a proof verdict.
+
+A task that entered the governance path cannot leave it: `run`, `retry`,
+`resume` and `run_ready` refuse or skip it, so a gate can never be re-executed
+without a fresh decision. `python3 -m harness verify` re-runs the receipt
+verifier and fails if a governed proof has no valid receipt or if any bound
+digest no longer matches.
+
 ## Honest limits
 
 - Local-only. No remote attestation, no transparency log, no revocation.
@@ -182,8 +225,28 @@ claim: regenerate it.
 - Lite-tier captures are auto-reviewed by the kernel (`auto-approve-lite`).
   `EVIDENCED` there means the mechanical gate passed, not that an independent
   identity reviewed the claim.
-- The runtime is not a governance layer: it does not decide whether an action is
-  allowed. That is the Guardian's job and the subject of the VEOR audit.
+- The runtime does not decide whether an action is allowed. In the governed
+  path that decision belongs to the pinned VEOR sidecar
+  (`harness/governed.py`); the ungoverned path has no governance at all, by
+  design, and works with no Node.js installed.
 - `harness/` is a repository-local package, not an installed one: run
   `python3 -m harness` from the repository root, or put the root on
   `PYTHONPATH`. Packaging it is a release decision, not a silent side effect.
+
+Governed path (G02) specifically:
+
+- a governed gate still runs as a plain child process: no sandbox, no OS
+  isolation. The receipt says `sandbox: none / os_enforced: false`, and the
+  decision artifact records the same, because it is true.
+- the receipt proves that the holder of the receipt key decided and executed
+  this args digest. It does not prove *which* checkout signed it, and there is no
+  remote attestation.
+- same-user model: the process that runs `run-governed` could in principle read
+  the receipt key file. Custody is a filesystem/OS boundary (ADR 0003), not a
+  cryptographic one.
+- the harness never signs an approval. A `REVIEW` blocks until an operator signs
+  the pending challenge with the approval key, out of band. The test suite does
+  this itself and is therefore a *test fixture*, not evidence of human approval.
+- only the harness surface is governed. A same-user shell can still run the same
+  commands directly; VEOR cannot see that, and this delivery claims nothing
+  about it.

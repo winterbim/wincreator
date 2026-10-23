@@ -79,8 +79,19 @@ class Executor:
         ]
 
     # -------------------------------------------------------------------- run
-    def run(self, task_id):
+    def _is_governed(self, task_id):
+        return any(
+            event["type"].startswith("governance_")
+            for event in self.store.events(task_id)
+        )
+
+    def run(self, task_id, extra_files=(), on_capture=None, governed=False):
         task = self.store.get_task(task_id)
+        if not governed and self._is_governed(task_id):
+            raise InvalidTransition(
+                f"task {task_id} is governed and must run through the governance path; "
+                "a plain run or retry would bypass the VEOR decision"
+            )
         if task.state == "PENDING":
             self.store.transition(task_id, "READY", actor=self.builder, reason="admitted")
         elif task.state != "READY":
@@ -103,6 +114,7 @@ class Executor:
                 task.attest_dir,
                 task.workspace,
                 builder=self.builder,
+                extra_files=extra_files,
             )
         except (OSError, ValueError, KeyError, RuntimeError) as error:
             self.store.finish_attempt(
@@ -149,6 +161,39 @@ class Executor:
             review_digest=review_digest,
             actor=self.builder,
         )
+        if on_capture is not None:
+            try:
+                on_capture(
+                    {
+                        "task_id": task_id,
+                        "attempt_no": attempt_no,
+                        "attestation": attestation,
+                        "attestation_path": attestation_path,
+                        "payload": payload,
+                    }
+                )
+            except (OSError, ValueError, RuntimeError) as error:
+                self.store.finish_attempt(
+                    task_id,
+                    attempt_no,
+                    outcome="ERROR",
+                    state="BLOCKED",
+                    reason="governance could not establish a verified receipt",
+                    detail=str(error),
+                    actor=self.builder,
+                )
+                self._say(f"[BLOCKED] {task_id} governance: {error}")
+                return {
+                    "task_id": task_id,
+                    "state": "BLOCKED",
+                    "attempt_no": attempt_no,
+                    "capture_status": capture_status,
+                    "attestation_path": os.path.abspath(attestation_path),
+                    "attestation_digest": attestation_digest,
+                    "return_code": payload["capture"]["exit_code"],
+                    "review_required": False,
+                    "error": str(error),
+                }
         if capture_status == "CAPTURED_FAIL":
             state, reason = "FAILED", "gate failed"
         elif capture_status == "CAPTURE_ERROR":
@@ -260,6 +305,12 @@ class Executor:
         for task in targets:
             current = self.store.get_task(task.task_id)
             if current.state == "INTERRUPTED" and retry:
+                if self._is_governed(task.task_id):
+                    self._say(
+                        f"[BLOCKED] {task.task_id} is governed; resume will not retry it "
+                        "ungoverned (re-run through `run-governed`)"
+                    )
+                    continue
                 try:
                     self.store.retry(
                         task.task_id, reason="resume after interruption", actor="resume"
@@ -269,12 +320,24 @@ class Executor:
                     continue
             current = self.store.get_task(task.task_id)
             if current.state == "READY":
+                if self._is_governed(task.task_id):
+                    self._say(
+                        f"[SKIPPED] {task.task_id} is governed; resume will not run it "
+                        "without a fresh VEOR decision (re-run through `run-governed`)"
+                    )
+                    continue
                 results.append(self.run(task.task_id))
         return {"reaped": reaped, "results": results}
 
     def run_ready(self):
         results = []
         for task in self.store.list_tasks(state="READY"):
+            if self._is_governed(task.task_id):
+                self._say(
+                    f"[SKIPPED] {task.task_id} is governed; use `run-governed` so a "
+                    "VEOR decision precedes the gate"
+                )
+                continue
             results.append(self.run(task.task_id))
         return results
 
@@ -337,15 +400,39 @@ class Executor:
             "review_digest": review_digest,
         }
 
-    def retry(self, task_id, reason):
+    def retry(self, task_id, reason, governed=False):
         if not reason or not reason.strip():
             raise ValueError("retry requires a stated reason")
+        if not governed and self._is_governed(task_id):
+            raise InvalidTransition(
+                f"task {task_id} is governed; a retry would execute the gate without a "
+                "fresh VEOR decision (use `run-governed --retry-reason`)"
+            )
         previous = self.store.retry(task_id, reason=reason, actor=self.builder)
         self._say(f"[READY] {task_id} retry scheduled from {previous}: {reason}")
         return previous
 
     # ----------------------------------------------------------------- verify
-    def verify(self, require_complete=False):
+    def _governance_problems(self, task, governance_config=None):
+        """Re-verify any VEOR receipt bound to this task's proof.
+
+        A governed task whose receipt cannot be verified offline is a problem,
+        never a silent pass. Tasks that never entered the governance path are
+        unaffected, which keeps VEOR optional.
+        """
+        if not self._is_governed(task.task_id):
+            return []
+        from harness import governed
+
+        config = governance_config or governed.GovernanceConfig.for_root(
+            self.store.root
+        )
+        try:
+            return governed.verify_task(self, task.task_id, config)
+        except governed.governance.GovernanceUnavailable as error:
+            return [f"{task.task_id}: governance: {error}"]
+
+    def verify(self, require_complete=False, governance_config=None):
         problems = list(self.store.verify_integrity())
         summary = {"tasks": 0, "succeeded": 0, "proofs": 0, "pending": []}
         tasks = self.store.list_tasks()
@@ -359,6 +446,7 @@ class Executor:
             if proof is None:
                 continue
             summary["proofs"] += 1
+            problems.extend(self._governance_problems(task, governance_config))
             ok, issues = kernel.verify_attestation(proof["attestation_path"])
             if not ok:
                 problems.extend(

@@ -151,23 +151,35 @@ def resolve_home(pin_path, home=None, env=None):
     return os.path.abspath(default)
 
 
-def _checkout_commit(home):
+def _checkout_state(home):
+    """Return (commit, dirty, problem) for the pinned checkout."""
     git_directory = os.path.join(home, ".git")
     if not os.path.isdir(git_directory):
-        return None, "checkout has no git metadata, so its commit cannot be proven"
+        return None, None, "checkout has no git metadata, so its commit cannot be proven"
     try:
-        result = subprocess.run(
+        head = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=home,
             capture_output=True,
             text=True,
             timeout=20,
         )
+        status = subprocess.run(
+            ["git", "status", "--porcelain=v1"],
+            cwd=home,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
     except (OSError, subprocess.SubprocessError) as error:
-        return None, f"cannot read checkout commit: {error}"
-    if result.returncode != 0:
-        return None, "cannot read checkout commit"
-    return (result.stdout or "").strip(), None
+        return None, None, f"cannot read checkout state: {error}"
+    if head.returncode != 0 or status.returncode != 0:
+        return None, None, "cannot read checkout state"
+    return (
+        (head.stdout or "").strip(),
+        bool((status.stdout or "").strip()),
+        None,
+    )
 
 
 def _package_version(home):
@@ -204,12 +216,17 @@ def check(pin_path=None, home=None, env=None, node=None, node_version_override=N
         reasons.append(
             f"VEOR package version {version} does not match pinned {pin['package_version']}"
         )
-    commit, commit_problem = _checkout_commit(resolved_home)
+    commit, dirty, commit_problem = _checkout_state(resolved_home)
     if commit_problem:
         reasons.append(commit_problem)
     elif commit != pin["commit"]:
         reasons.append(
             f"VEOR checkout is at {commit}, pinned at {pin['commit']}"
+        )
+    elif dirty:
+        reasons.append(
+            "VEOR checkout has local modifications; the pinned commit no longer "
+            "describes the code that would run"
         )
     entrypoint = os.path.join(resolved_home, pin["sidecar"]["entrypoint"])
     if not os.path.isfile(entrypoint):
@@ -230,19 +247,23 @@ def check(pin_path=None, home=None, env=None, node=None, node_version_override=N
 class Sidecar:
     """One-shot JSON-lines client for the pinned VEOR decision kernel."""
 
-    def __init__(self, home, pin, node="node", timeout=60):
+    def __init__(self, home, pin, node="node", timeout=60, env=None):
         self.home = os.path.abspath(home)
         self.pin = pin
         self.node = node
         self.timeout = timeout
+        self.env = dict(env or {})
         self.entrypoint = os.path.join(self.home, pin["sidecar"]["entrypoint"])
 
     def _request(self, method, params):
         request = json.dumps({"id": 1, "method": method, "params": params})
+        environment = os.environ.copy()
+        environment.update(self.env)
         try:
             result = subprocess.run(
                 [self.node, self.entrypoint],
                 cwd=self.home,
+                env=environment,
                 input=request + "\n",
                 capture_output=True,
                 text=True,
@@ -318,6 +339,30 @@ class Sidecar:
             raise GovernanceUnavailable("VEOR returned no policy digest")
         return Decision(decision, tuple(reasons), policy_digest, result)
 
+    def receipt(self, decision_record, result_digest, executed, verified=None, sandbox=None):
+        """Ask VEOR to sign an execution receipt for this decision."""
+        if not isinstance(decision_record, dict) or not decision_record:
+            raise GovernanceUnavailable("a decision record is required to sign a receipt")
+        result = self._request(
+            "receipt",
+            {
+                "decisionRecord": decision_record,
+                "resultDigest": result_digest,
+                "executed": bool(executed),
+                "verified": verified,
+                "sandbox": sandbox,
+            },
+        )
+        if not isinstance(result.get("signature"), str) or not result["signature"]:
+            raise GovernanceUnavailable(
+                "VEOR returned an unsigned receipt; no receipt authority is configured"
+            )
+        if not isinstance(result.get("body"), dict) or not isinstance(
+            result.get("digest"), str
+        ):
+            raise GovernanceUnavailable("VEOR returned a malformed receipt")
+        return result
+
 
 def bind_result(attestation_digest, return_code, stdout_sha256, stderr_sha256):
     """Deterministic payload a VEOR receipt binds for a WinCreator capture.
@@ -366,10 +411,11 @@ def interpret_receipt_result(returncode, stdout, stderr=""):
     return document
 
 
-def verify_receipt(home, pin, receipt_path, public_key_path, node="node", timeout=60):
+def receipt_verifier_argv(home, pin, receipt_path, public_key_path, node="node"):
+    """Exact command that verifies a receipt; recorded so a review can replay it."""
     # The pin lists the verifier entrypoint first, then its fixed sub-command.
     verifier = pin["sidecar"]["receipt_verify"]
-    argv = [
+    return [
         node,
         os.path.join(os.path.abspath(home), verifier[0]),
         *verifier[1:],
@@ -377,6 +423,10 @@ def verify_receipt(home, pin, receipt_path, public_key_path, node="node", timeou
         "--public",
         public_key_path,
     ]
+
+
+def verify_receipt(home, pin, receipt_path, public_key_path, node="node", timeout=60):
+    argv = receipt_verifier_argv(home, pin, receipt_path, public_key_path, node)
     try:
         result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError) as error:

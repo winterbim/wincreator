@@ -41,7 +41,7 @@ TERMINAL_STATES = frozenset({"SUCCEEDED"})
 BLOCKING_STATES = frozenset({"FAILED", "BLOCKED", "INTERRUPTED", "AWAITING_REVIEW"})
 TRANSITIONS = {
     "PENDING": frozenset({"READY"}),
-    "READY": frozenset({"RUNNING"}),
+    "READY": frozenset({"RUNNING", "BLOCKED"}),
     "RUNNING": frozenset({"AWAITING_REVIEW", "SUCCEEDED", "FAILED", "BLOCKED", "INTERRUPTED"}),
     "INTERRUPTED": frozenset({"READY"}),
     "AWAITING_REVIEW": frozenset({"SUCCEEDED", "FAILED", "BLOCKED"}),
@@ -667,6 +667,20 @@ class Store:
                 digest,
             ),
         )
+
+    def record_governance_event(
+        self, task_id, attempt_no, payload, actor="governance", event_type="governance_bound"
+    ):
+        """Journal-only record; it never writes a proof verdict or a status."""
+        if not isinstance(payload, dict):
+            raise StoreError("governance payload must be an object")
+        if not str(event_type).startswith("governance_"):
+            raise StoreError(f"invalid governance event type: {event_type!r}")
+        with self._write() as connection:
+            self._task_row(connection, task_id)
+            self._append_event(
+                connection, task_id, event_type, actor, attempt_no, payload
+            )
 
     def events(self, task_id=None):
         with self._read() as connection:

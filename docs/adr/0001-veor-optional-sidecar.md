@@ -1,6 +1,7 @@
 # ADR 0001 — VEOR is an optional, pinned sidecar
 
-Status: accepted (2026-10-23) — implementation PARTIAL, see `docs/G02_STATUS.md`.
+Status: accepted (2026-10-23); governed path implemented 2026-10-24 — see
+`docs/G02_STATUS.md` for what is exercised and what is not claimed.
 
 ## Context
 
@@ -22,7 +23,9 @@ not provide.
 - The core package (`skill/wincreator`) and the runtime remain stdlib-only. No
   npm dependency is added, nothing is vendored, nothing is cloned implicitly.
 - Every prerequisite failure (pin, checkout commit, package version, entrypoint,
-  Node floor) yields **BLOCKED**, never a default allow.
+  Node floor, **or a modified checkout whose HEAD still matches**) yields
+  **BLOCKED**, never a default allow: a dirty tree means the pinned commit no
+  longer describes the code that would run.
 - The pin is a commit SHA because VEOR is not published on npm (registry
   returned E404 on 2026-10-23) and `0.4.0-dev.6` is a developer preview.
 

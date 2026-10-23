@@ -119,6 +119,20 @@ def test_status_blocks_when_pinned_commit_differs(tmp_path):
     assert any("pinned at" in reason for reason in status.reasons)
 
 
+def test_status_blocks_when_the_checkout_is_modified(tmp_path):
+    home, commit = _checkout(tmp_path)
+    (home / "src" / "kernel" / "stdio.js").write_text(
+        "// patched after the audit\n", encoding="utf-8"
+    )
+
+    status = governance.check(
+        str(_pin_file(tmp_path, commit)), home=str(home), node_version_override="v22.1.0"
+    )
+
+    assert not status.ready
+    assert any("local modifications" in reason for reason in status.reasons)
+
+
 def test_status_blocks_without_git_metadata(tmp_path):
     home, commit = _checkout(tmp_path)
     shutil.rmtree(home / ".git")
@@ -237,6 +251,20 @@ def test_sidecar_unknown_advisory_blocks(tmp_path):
 
     with pytest.raises(governance.GovernanceUnavailable, match="unknown advisory"):
         sidecar.decide("filesystem.read_file", {}, advisory="MAYBE")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_sidecar_timeout_blocks_instead_of_allowing(tmp_path):
+    home, commit = _checkout(tmp_path)
+    (home / "src" / "kernel" / "stdio.js").write_text(
+        "setTimeout(() => {}, 30000);\n", encoding="utf-8"
+    )
+    pin = governance.load_pin(str(_pin_file(tmp_path, commit)))
+
+    with pytest.raises(governance.GovernanceUnavailable, match="cannot run VEOR sidecar"):
+        governance.Sidecar(str(home), pin, timeout=0.4).decide(
+            "filesystem.read_file", {"path": "x"}
+        )
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -370,7 +398,17 @@ def test_authority_decision_cannot_carry_a_ledger_status():
     assert "status" not in fields
 
 
-@pytest.mark.parametrize("name", ["G02-01.json", "G02-02.json", "G02-03.json", "G02-04.json"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "G02-01.json",
+        "G02-02.json",
+        "G02-03.json",
+        "G02-04.json",
+        "G02-05.json",
+        "G02-06.json",
+    ],
+)
 def test_g02_contracts_parse_and_bind_existing_files(name):
     from harness.contracts import TaskContract
 

@@ -29,7 +29,7 @@ def _git_repo(home, version):
         "user.name=veor-check",
     ]
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=home, check=True)
-    subprocess.run(["git", *env_args, "add", "package.json"], cwd=home, check=True)
+    subprocess.run(["git", *env_args, "add", "-A"], cwd=home, check=True)
     subprocess.run(
         ["git", *env_args, "commit", "-qm", "fake pinned checkout"], cwd=home, check=True
     )
@@ -67,13 +67,28 @@ def self_test():
 
     with tempfile.TemporaryDirectory(prefix="veor-check-") as directory:
         home = os.path.join(directory, "veor")
-        commit = _git_repo(home, "0.4.0-dev.6")
         os.makedirs(os.path.join(home, "src", "kernel"))
-        open(os.path.join(home, "src", "kernel", "stdio.js"), "w").close()
+        entrypoint = os.path.join(home, "src", "kernel", "stdio.js")
+        open(entrypoint, "w").close()
+        commit = _git_repo(home, "0.4.0-dev.6")
         pin_path = _write_pin(os.path.join(directory, "pin.json"), commit)
 
         ready = governance.check(pin_path, home=home, node_version_override="v22.1.0")
         check("ready_when_fully_pinned", ready.ready)
+
+        with open(entrypoint, "a", encoding="utf-8") as handle:
+            handle.write("// patched after the audit\n")
+        dirty = governance.check(pin_path, home=home, node_version_override="v22.1.0")
+        check(
+            "dirty_checkout_blocks",
+            not dirty.ready
+            and any("local modifications" in reason for reason in dirty.reasons),
+        )
+        open(entrypoint, "w").close()
+        check(
+            "clean_checkout_ready_again",
+            governance.check(pin_path, home=home, node_version_override="v22.1.0").ready,
+        )
 
         wrong_version = governance.check(
             _write_pin(os.path.join(directory, "pin-version.json"), commit, version="9.9.9"),
