@@ -7,12 +7,12 @@ streams.
 - Claim: a runtime killed mid-gate is recovered by resume with an abandoned attempt, a retry and a clean journal
 - Gate: `python3 -m pytest -q tests/test_harness_crash.py`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (531 ms)
-- Commit at capture: `1941d12958b287d093bfb55816cd1626458ac6e1`
+- Capture: CAPTURED_PASS exit=0 (514 ms)
+- Commit at capture: `3167651472a639decf49ac17b835b21395e044e9`
 - Working tree at capture: dirty=True — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/H04/20261023T215446.555345Z-459da777-f98f-47f3-bbf6-e83592cc0c8a/attestation.json`
-- Attestation sha256: `4d18638226d8b95b32adc98e53f388bc90968d6c2f01bd4a70b78dafbf20c8e1`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/H04/20261023T232447.023240Z-21e913cf-ae16-4c92-abbf-952437e8a983/attestation.json`
+- Attestation sha256: `947fba424ba1440d9971b2fb3a16748a4d2cc05a36598c6b2b818c289fbd0f3c`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files

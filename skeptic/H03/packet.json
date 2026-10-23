@@ -1,15 +1,15 @@
 {
   "schema": "wincreator.challenge-packet/v1",
   "payload": {
-    "attestation_digest": "8dbbc6b3f495388012930976bbb9bd025b893d81950ff44775ce6e1261b97e3e",
+    "attestation_digest": "b130e7952a02ddfbd68107dae9c91e793cf47594a865ac80c6c1683758c990c0",
     "claim": {
       "id": "H03",
       "level": "Meso",
       "text": "the runtime executes gates through the existing proof kernel and refuses SUCCEEDED without an EVIDENCED review",
       "gate": "`python3 -m pytest -q tests/test_harness_runtime.py tests/test_harness_cli_audit.py`",
       "row_sha256": "2a6613c56935775d67a9b39f4a0e69b9e60b7e1f5cb728179800b5d500b504c1",
-      "ledger_sha256_before": "10d2d77f5b3f1f7467f3ee6a529863fe3a708b93a5329f21b918d4123571aeb8",
-      "status_before": "CLAIMED"
+      "ledger_sha256_before": "799282eb08ab28a2edf637f8c7e523956f6e43efb972a81ab2e81c4a17ec2084",
+      "status_before": "PENDING"
     },
     "capture": {
       "status": "CAPTURED_PASS",
@@ -25,12 +25,12 @@
       "tests/test_harness_cli_audit.py"
     ],
     "stdout": {
-      "sha256": "dd3c92a9fd83caadd95417541ec819144207ab1d21a45aba639a29c7dbe80eed",
+      "sha256": "1b4955e32559e297b0dcd20ba58b55178c5239c76fa6d0c794b532a40336cfed",
       "original_bytes": 99,
       "stored_bytes": 99,
       "truncated": false,
       "body_stored": true,
-      "tail": "...................                                                      [100%]\n19 passed in 2.54s\n"
+      "tail": "....................                                                     [100%]\n20 passed in 2.10s\n"
     },
     "stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -45,29 +45,29 @@
         "path": "harness/runtime.py",
         "optional": false,
         "missing": false,
-        "sha256": "7c999fcc6525e2d6e4d7024b4984542b7b98605626349050603fb27162fae0f3",
-        "bytes": 16842
+        "sha256": "d3ab800eadff9e23ef6274ffa17c33341f1d051b05c1ae870abd277c454d5e73",
+        "bytes": 20800
       },
       {
         "path": "harness/kernel.py",
         "optional": false,
         "missing": false,
-        "sha256": "df690b3c41b1afe836289599118656aea8ec52e1466e848e26336b032f270843",
-        "bytes": 6992
+        "sha256": "67f208b625e087d1d92aed3d20a10a46df950962a7c8f23a0539b05dfc049532",
+        "bytes": 7055
       },
       {
         "path": "harness/cli.py",
         "optional": false,
         "missing": false,
-        "sha256": "eb23bdda55f2163fd946517fef97ba6bd6257815c5414624e2b1a52a648236dd",
-        "bytes": 14383
+        "sha256": "18300787394085be9f93c1786379ffcc505eaf8a728c091edfab9c33baefe83f",
+        "bytes": 17744
       },
       {
         "path": "tests/test_harness_runtime.py",
         "optional": false,
         "missing": false,
-        "sha256": "2822b1daae23d4aa67e92eb08176a7e32569afab06ac3c7827ee8916691e6f25",
-        "bytes": 8475
+        "sha256": "f1af2251c9fa1436e289c9c7503dc94d60da2eceb126e6bada593cc8f5bec247",
+        "bytes": 8759
       },
       {
         "path": "tests/test_harness_cli_audit.py",
@@ -79,18 +79,18 @@
     ],
     "git": {
       "available": true,
-      "commit": "1941d12958b287d093bfb55816cd1626458ac6e1",
-      "tree": "e779b08486814490185cb2f7f452f93a88f2fcc9",
+      "commit": "3167651472a639decf49ac17b835b21395e044e9",
+      "tree": "2f5469cd553eeb94068e5e7d60d9e769f3a3c7ef",
       "branch": "feat/harness-runtime-v1",
       "dirty": true,
       "submodules": "",
-      "untracked_digest": "f34613a73d8acf605a6b1cb2873483ee4e39c52bb4266e47a159f214431615a3",
-      "worktree_digest": "6ca9426b020d66a0dcad11b88228f690661aaa8af65c4f307fe91c316215a3c6"
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "fc07ca4eb4b5e901264a659f837ad0db2bb974bde7e31499938e6fc980873e09"
     },
     "policy": {
       "tier": "standard",
       "private": false
     }
   },
-  "digest": "283c8bbc337bff35866742ab39a62c3a05d70379d9117cc4aab04b780db67c5e"
+  "digest": "8921edf33eecc0112b12cbe44fc3e85e7feb088964b54b502e9097b122dd2547"
 }

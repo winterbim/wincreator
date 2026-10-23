@@ -1,15 +1,15 @@
 {
   "schema": "wincreator.challenge-packet/v1",
   "payload": {
-    "attestation_digest": "4d18638226d8b95b32adc98e53f388bc90968d6c2f01bd4a70b78dafbf20c8e1",
+    "attestation_digest": "947fba424ba1440d9971b2fb3a16748a4d2cc05a36598c6b2b818c289fbd0f3c",
     "claim": {
       "id": "H04",
       "level": "Meso",
       "text": "a runtime killed mid-gate is recovered by resume with an abandoned attempt, a retry and a clean journal",
       "gate": "`python3 -m pytest -q tests/test_harness_crash.py`",
       "row_sha256": "5dc674af1c31a35d68afcc61f559b93ae2f14c8c578865bf5d41cf56b0a22b8c",
-      "ledger_sha256_before": "374e6ed3485fab5900e864b774c17ad28b60d05e2d9f3df33664367a5ad67890",
-      "status_before": "CLAIMED"
+      "ledger_sha256_before": "c904b3aac5fb621b58c250fcab924320bc50681d8bd10261cc5c18acdc00bf29",
+      "status_before": "PENDING"
     },
     "capture": {
       "status": "CAPTURED_PASS",
@@ -24,12 +24,12 @@
       "tests/test_harness_crash.py"
     ],
     "stdout": {
-      "sha256": "36ee6125777253800df314c891baf72e42248a17540db95c6bdb02de742e24de",
+      "sha256": "016a4093788648644b08006f7d1d171ca7639313677f5aa929f004d4a3e52465",
       "original_bytes": 98,
       "stored_bytes": 98,
       "truncated": false,
       "body_stored": true,
-      "tail": ".                                                                        [100%]\n1 passed in 0.23s\n"
+      "tail": ".                                                                        [100%]\n1 passed in 0.22s\n"
     },
     "stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -44,15 +44,15 @@
         "path": "harness/runtime.py",
         "optional": false,
         "missing": false,
-        "sha256": "7c999fcc6525e2d6e4d7024b4984542b7b98605626349050603fb27162fae0f3",
-        "bytes": 16842
+        "sha256": "d3ab800eadff9e23ef6274ffa17c33341f1d051b05c1ae870abd277c454d5e73",
+        "bytes": 20800
       },
       {
         "path": "harness/store.py",
         "optional": false,
         "missing": false,
-        "sha256": "df9f54a8dfc0e9869c58f853b0850e96691846487b4f6aa4ab3dc3c19954768b",
-        "bytes": 30312
+        "sha256": "a6abe5160251f288b7a2c3fa6c64bf53f816e2cfce9df6682103b427b1b3ce36",
+        "bytes": 30998
       },
       {
         "path": "tests/test_harness_crash.py",
@@ -64,18 +64,18 @@
     ],
     "git": {
       "available": true,
-      "commit": "1941d12958b287d093bfb55816cd1626458ac6e1",
-      "tree": "e779b08486814490185cb2f7f452f93a88f2fcc9",
+      "commit": "3167651472a639decf49ac17b835b21395e044e9",
+      "tree": "2f5469cd553eeb94068e5e7d60d9e769f3a3c7ef",
       "branch": "feat/harness-runtime-v1",
       "dirty": true,
       "submodules": "",
-      "untracked_digest": "3ae1b1c48f6ba4be39cf24b9f9ffc93b77a364df3038fd44071002be488e653c",
-      "worktree_digest": "bc15b3ca6bb942af50dd2fc2e25756360e3a8883f042a94185923f8ec7663454"
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "147ff61085de4c7f76ab8e3ef08d6a88d09722ec7796071f07752bfd7b8a75fd"
     },
     "policy": {
       "tier": "standard",
       "private": false
     }
   },
-  "digest": "15b500e7c748c031e4640138ab18c5dbf30709823346191284c92754d9d57393"
+  "digest": "b82091d338ad5a5e6e717be475ff1cad166d15187f8591f4323baf58e9c5a0fe"
 }

@@ -7,12 +7,12 @@ streams.
 - Claim: the state machine rejects every undeclared transition, contracts are immutable once registered, and the journal detects edits to retained events and deletion of an event that has a successor
 - Gate: `python3 -m pytest -q tests/test_harness_contracts.py tests/test_harness_store.py`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (871 ms)
-- Commit at capture: `1941d12958b287d093bfb55816cd1626458ac6e1`
+- Capture: CAPTURED_PASS exit=0 (879 ms)
+- Commit at capture: `3167651472a639decf49ac17b835b21395e044e9`
 - Working tree at capture: dirty=True — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/H07/20261023T215455.087077Z-19a2219a-ca76-4755-9193-75a3dd1c4678/attestation.json`
-- Attestation sha256: `9b61cf04c06a84d8f106d548095ecce11922b19067c48e28084e75705a85f0cf`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/H07/20261023T232447.640402Z-f965fe57-44f3-4294-804c-331db4dd2663/attestation.json`
+- Attestation sha256: `d44eee27e265edab004f88e12e6615dc273de1ea61021b20fea87dc312e42cf3`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files
