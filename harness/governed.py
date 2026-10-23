@@ -99,6 +99,15 @@ def _file_sha256(path):
     return file_digest(path)
 
 
+def _same_path(left, right):
+    """Compare persisted portable paths with native ones (Windows separators)."""
+    if not left or not right:
+        return False
+    return os.path.normcase(os.path.abspath(str(left))) == os.path.normcase(
+        os.path.abspath(str(right))
+    )
+
+
 def _veor_canonical(value):
     """Mirror VEOR's canonicalJson: sorted keys, compact separators, no HTML escape."""
     if value is None or isinstance(value, (str, bool)):
@@ -359,7 +368,9 @@ def verify_task(executor, task_id, config):
                 "re-verified artifact"
             )
     proof = executor.store.latest_proof(task_id)
-    if proof is None or proof["attestation_path"] != record["attestation_path"]:
+    if proof is None or not _same_path(
+        proof["attestation_path"], record["attestation_path"]
+    ):
         problems.append(
             f"{task_id}: the verified receipt is not bound to the stored proof"
         )
