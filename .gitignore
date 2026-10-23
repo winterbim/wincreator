@@ -20,3 +20,7 @@ dist/
 .harness/
 .harness-artifacts/
 HARNESS_PROOF_LEDGER.md
+
+# Raw benchmark runs contain agent logs and generated workspaces. The summary,
+# commands and price schedule are committed; the raw trees stay local.
+bench-results/

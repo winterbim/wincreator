@@ -141,6 +141,86 @@ def load_agent_metrics(path):
         return {"status": "invalid", "error": str(exc)}
 
 
+def load_price_schedule(path):
+    """Load an explicit, sourced token-price schedule; never invent prices."""
+    if not path:
+        return None
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("schema") != "wincreator.bench-price/v1":
+        raise ValueError("invalid price schedule schema")
+    for key in ("input_usd_per_mtok", "output_usd_per_mtok"):
+        value = data.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"price schedule {key} must be a non-negative number")
+    cached = data.get("cached_input_usd_per_mtok")
+    if cached is not None and (
+        not isinstance(cached, (int, float)) or isinstance(cached, bool) or cached < 0
+    ):
+        raise ValueError(
+            "price schedule cached_input_usd_per_mtok must be a non-negative number"
+        )
+    if not isinstance(data.get("source"), str) or not data["source"].strip():
+        raise ValueError("price schedule needs a source so the rates are auditable")
+    return data
+
+
+def compute_cost(agent_metrics, schedule):
+    """Token-derived cost at the supplied rates, or an explicit unavailable."""
+    if schedule is None:
+        return {"status": "unavailable", "reason": "no price schedule supplied"}
+    if agent_metrics.get("status") != "valid":
+        return {"status": "unavailable", "reason": "agent metrics are not valid"}
+    usage = (agent_metrics.get("payload") or {}).get("usage")
+    if not isinstance(usage, dict):
+        return {"status": "unavailable", "reason": "provider reported no token usage"}
+
+    def token(key):
+        value = usage.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return None
+
+    input_tokens = token("input_tokens")
+    output_tokens = token("output_tokens")
+    cached_tokens = token("cached_input_tokens") or 0
+    if input_tokens is None or output_tokens is None:
+        return {
+            "status": "unavailable",
+            "reason": "provider usage lacks input_tokens or output_tokens",
+        }
+    if cached_tokens > input_tokens:
+        return {
+            "status": "unavailable",
+            "reason": "cached_input_tokens exceeds input_tokens",
+        }
+    cached_rate = schedule.get("cached_input_usd_per_mtok")
+    if cached_tokens and cached_rate is None:
+        return {
+            "status": "unavailable",
+            "reason": "cached tokens present but the schedule has no cached-input rate",
+        }
+    usd = (
+        (input_tokens - cached_tokens) * schedule["input_usd_per_mtok"]
+        + cached_tokens * (cached_rate or 0)
+        + output_tokens * schedule["output_usd_per_mtok"]
+    ) / 1_000_000
+    return {
+        "status": "available",
+        "usd": round(usd, 6),
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_tokens,
+        "output_tokens": output_tokens,
+        "rates": {
+            "input_usd_per_mtok": schedule["input_usd_per_mtok"],
+            "cached_input_usd_per_mtok": cached_rate,
+            "output_usd_per_mtok": schedule["output_usd_per_mtok"],
+        },
+        "source": schedule["source"],
+        "retrieved_at": schedule.get("retrieved_at"),
+        "basis": "token-equivalent at published rates, not a billed amount",
+    }
+
+
 def load_manifest(path):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if data.get("schema") != "wincreator.ablation-manifest/v1":
@@ -212,7 +292,15 @@ def prepare_workspace(case, manifest_dir, condition, run_root):
     return workspace, prompt, treatment
 
 
-def run_case(case, manifest_dir, condition, repetition, agent_template, output_root):
+def run_case(
+    case,
+    manifest_dir,
+    condition,
+    repetition,
+    agent_template,
+    output_root,
+    price_schedule=None,
+):
     run_root = output_root / case["id"] / f"rep-{repetition:02d}" / condition
     run_root.mkdir(parents=True, exist_ok=False)
     workspace, prompt, treatment = prepare_workspace(case, manifest_dir, condition, run_root)
@@ -250,6 +338,7 @@ def run_case(case, manifest_dir, condition, repetition, agent_template, output_r
         "agent_command": command,
         "agent": agent,
         "agent_metrics": agent_metrics,
+        "cost": compute_cost(agent_metrics, price_schedule),
         "grader": grader,
         "passed": grader["status"] == "completed" and grader["exit_code"] == 0,
         "structure": structure(workspace),
@@ -275,6 +364,15 @@ def summarize(results):
         if not rows:
             continue
         passed = sum(item["passed"] for item in rows)
+        costs = [
+            item["cost"]["usd"] for item in rows
+            if item.get("cost", {}).get("status") == "available"
+        ]
+        usage_tokens = [
+            (item["cost"]["input_tokens"], item["cost"]["output_tokens"])
+            for item in rows
+            if item.get("cost", {}).get("status") == "available"
+        ]
         summary[condition] = {
             "runs": len(rows),
             "passed": passed,
@@ -285,11 +383,22 @@ def summarize(results):
             "mean_nonblank_lines": round(
                 sum(item["structure"]["nonblank_lines"] for item in rows) / len(rows), 2
             ),
+            "costed_runs": len(costs),
+            "total_cost_usd": round(sum(costs), 6) if costs else None,
+            "total_input_tokens": sum(pair[0] for pair in usage_tokens) or None,
+            "total_output_tokens": sum(pair[1] for pair in usage_tokens) or None,
         }
     return summary
 
 
-def run_benchmark(manifest_path, agent_template, output, repetitions=3, condition="both"):
+def run_benchmark(
+    manifest_path,
+    agent_template,
+    output,
+    repetitions=3,
+    condition="both",
+    price_schedule=None,
+):
     manifest_path = Path(manifest_path).resolve()
     manifest = load_manifest(manifest_path)
     manifest_dir = manifest_path.parent
@@ -303,7 +412,15 @@ def run_benchmark(manifest_path, agent_template, output, repetitions=3, conditio
         for case in manifest["cases"]:
             for current in conditions:
                 results.append(
-                    run_case(case, manifest_dir, current, repetition, agent_template, output_root)
+                    run_case(
+                        case,
+                        manifest_dir,
+                        current,
+                        repetition,
+                        agent_template,
+                        output_root,
+                        price_schedule,
+                    )
                 )
     bundle = {
         "schema": "wincreator.ablation-bundle/v1",
@@ -374,6 +491,31 @@ def self_test():
         assert off["agent_metrics"]["payload"]["condition"] == "off"
         assert on["agent_metrics"]["payload"]["condition"] == "on"
         assert all(not row["isolation"]["grader_copied_into_workspace"] for row in bundle["results"])
+        assert all(row["cost"]["status"] == "unavailable" for row in bundle["results"])
+        schedule = {
+            "schema": "wincreator.bench-price/v1",
+            "input_usd_per_mtok": 1.0,
+            "cached_input_usd_per_mtok": 0.25,
+            "output_usd_per_mtok": 2.0,
+            "source": "self-test fixture, not a market rate",
+        }
+        metrics = {
+            "status": "valid",
+            "payload": {
+                "usage": {
+                    "input_tokens": 100,
+                    "cached_input_tokens": 20,
+                    "output_tokens": 30,
+                }
+            },
+        }
+        cost = compute_cost(metrics, schedule)
+        assert cost["status"] == "available"
+        assert cost["usd"] == 0.000145
+        assert compute_cost(metrics, None)["status"] == "unavailable"
+        no_cached_rate = dict(schedule)
+        no_cached_rate.pop("cached_input_usd_per_mtok")
+        assert compute_cost(metrics, no_cached_rate)["status"] == "unavailable"
         assert render_command(
             ['--config={"model":"x"}', "{condition}"], root, root / "p", "on"
         ) == ['--config={"model":"x"}', "on"]
@@ -405,6 +547,11 @@ def main(argv=None):
     parser.add_argument("--output")
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--condition", choices=("off", "on", "both"), default="both")
+    parser.add_argument(
+        "--price-schedule",
+        default=None,
+        help="JSON rates with a source; omit to record cost as unavailable",
+    )
     parser.add_argument("agent_command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.self_test:
@@ -419,8 +566,14 @@ def main(argv=None):
     if args.repetitions < 1:
         parser.error("--repetitions must be >= 1")
     try:
+        schedule = load_price_schedule(args.price_schedule)
         bundle = run_benchmark(
-            args.manifest, command, args.output, args.repetitions, args.condition
+            args.manifest,
+            command,
+            args.output,
+            args.repetitions,
+            args.condition,
+            schedule,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"BENCHMARK ERROR: {exc}", file=sys.stderr)

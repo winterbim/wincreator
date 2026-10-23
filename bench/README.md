@@ -56,6 +56,29 @@ The ON workspace contains `.agents/skills/wincreator`; the OFF workspace does no
 Every ON result also records the pre-run tree digest and VERSION of that exact
 copied Skill, so treatment identity is not inferred from the surrounding checkout.
 
+## Cost
+
+Pass `--price-schedule FILE` to attach a token-derived cost to each run. The
+schedule must carry a source; without one, or without provider token usage, the
+run records `cost.status = unavailable` rather than inventing a number:
+
+~~~json
+{
+  "schema": "wincreator.bench-price/v1",
+  "model": "gpt-6-luna",
+  "input_usd_per_mtok": 0.1,
+  "cached_input_usd_per_mtok": 0.01,
+  "output_usd_per_mtok": 0.5,
+  "source": "https://developers.openai.com/api/docs/pricing",
+  "retrieved_at": "2026-10-24"
+}
+~~~
+
+The result labels the number as *token-equivalent at published rates*, not the
+amount billed. A subscription account can have a different marginal cost.
+`bench/prices/` keeps the schedules used for a run so a reviewer can recompute
+the arithmetic.
+
 ## Codex CLI adapter
 
 For a real paired run with Codex CLI, authenticate Codex first, then pin the
