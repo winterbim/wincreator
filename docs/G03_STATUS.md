@@ -20,7 +20,7 @@ Skeptic verdict was produced.
 - Full provisioning from the pinned mirror → commit
   `87a6fb35ae2203baf2af83abe0ab20cc05e2bb32`, version `0.4.0-dev.6`,
   `npm ci` succeeded, `node --test` → **67/67**, exit 0.
-- `wincreator verify --ledger PROOF_LEDGER-harness.md` → **22 captures**
+- `wincreator verify --ledger PROOF_LEDGER-harness.md` → **29 captures**
   integrity-checked; **no drift failures**; exit 1 only for the **7 PENDING**
   rows (a green gate is not a verdict).
 - Full suite with `VEOR_HOME` set → **237 passed**; without it → **230 passed,
