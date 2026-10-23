@@ -1,0 +1,18 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-04",
+  "name": "Governance cannot become the proof authority",
+  "claim": "the governance module imports no store, ledger or proof code and exposes no way to write a status, so a VEOR decision can never evidence a WinCreator claim",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "-m", "pytest", "-q", "tests/test_governance.py", "-k", "authority or imports"],
+    "files": [
+      "harness/governance.py",
+      "tests/test_governance.py",
+      "docs/HARNESS_RUNTIME.md"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}

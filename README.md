@@ -246,6 +246,37 @@ passes, the verdict is `INSUFFICIENT`. This is deliberately narrower than a
 full mutation-testing framework; use a mature ecosystem mutator when one is
 already available and bind its report as WinCreator evidence.
 
+## Harness runtime (G00–G01)
+
+The repository now carries an execution engine for work that must stay auditable:
+typed task contracts, SQLite state, a tamper-evident event journal and crash
+resume, with every gate executed through the proof kernel above.
+
+```bash
+python3 -m harness init
+python3 -m harness add --id H1 --name "parser rejects malformed input" \
+  --claim "parser rejects malformed input" --level Micro --tier lite \
+  -- python3 -m pytest -q tests/test_parser.py
+python3 -m harness run H1
+python3 -m harness verify --require-complete
+```
+
+`SUCCEEDED` is refused without a `CAPTURED_PASS` capture whose review verdict is
+`EVIDENCED`; Standard-tier work stops at `AWAITING_REVIEW` until a separate
+identity reviews it. `resume` closes attempts whose owner died and re-runs them.
+See [`docs/HARNESS_RUNTIME.md`](docs/HARNESS_RUNTIME.md) for states, crash
+semantics, limits and the G00 audit. The governance layer is optional and
+blocked by default:
+
+```bash
+python3 -m harness governance     # exit 3 while no pinned VEOR checkout exists
+python3 tools/veor_check.py       # same check, same exit code
+```
+
+Governance never decides proof status. [`docs/VEOR_GUARDIAN_AUDIT.md`](docs/VEOR_GUARDIAN_AUDIT.md)
+records the executed VEOR audit, [`docs/G02_STATUS.md`](docs/G02_STATUS.md) the
+PARTIAL/BLOCKED status, and [`docs/adr/`](docs/adr/) the four decisions behind it.
+
 ## Public ON/OFF benchmark
 
 WinCreator now carries a paired ablation harness under [`bench/`](bench/README.md).
@@ -269,6 +300,7 @@ python3 skill/wincreator/scripts/challenge_packet.py self-test
 python3 bench/run_ablation.py --self-test
 python3 bench/validate_cases.py
 python3 skill/wincreator/scripts/package_check.py --self-test
+python3 -m harness selftest
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
 python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
@@ -283,6 +315,10 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 |---|---|
 | [`skill/wincreator/scripts/quick_prove.py`](skill/wincreator/scripts/quick_prove.py) | zero-setup default path |
 | [`skill/wincreator/scripts/distill_check.py`](skill/wincreator/scripts/distill_check.py) | structural before/after evidence for code distillation |
+| [`harness/`](harness/) | execution runtime: contracts, SQLite state, journal, crash resume |
+| [`docs/VEOR_GUARDIAN_AUDIT.md`](docs/VEOR_GUARDIAN_AUDIT.md) | VEOR audit and Guardian integration decision |
+| [`contracts/g02/`](contracts/g02/) | staged G02 governance task contracts |
+| [`docs/G02_STATUS.md`](docs/G02_STATUS.md) | G02 PARTIAL/BLOCKED status and exit criteria |
 | [`skill/wincreator/references/code-distillation.md`](skill/wincreator/references/code-distillation.md) | distillation doctrine, workflow and limits |
 | [`examples/minimal/`](examples/minimal/) | runnable sandbox |
 | [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | real Skeptic catch |

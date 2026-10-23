@@ -1,0 +1,17 @@
+{
+  "schema": "wincreator.veor-pin/v1",
+  "repository": "https://github.com/winterbim/veor",
+  "commit": "87a6fb35ae2203baf2af83abe0ab20cc05e2bb32",
+  "package_version": "0.4.0-dev.6",
+  "node_major": 22,
+  "audited_at": "2026-10-23",
+  "audit_document": "docs/VEOR_GUARDIAN_AUDIT.md",
+  "expected_tests": 67,
+  "sidecar": {
+    "entrypoint": "src/kernel/stdio.js",
+    "protocol": "json-lines",
+    "receipt_verify": ["src/cli.js", "verify", "receipt"]
+  },
+  "vendored": false,
+  "notes": "Not vendored and not published on npm (registry returned E404 on 2026-10-23). A checkout must be provided through VEOR_HOME and its git HEAD must equal this commit; WinCreator never clones or installs it on its own."
+}

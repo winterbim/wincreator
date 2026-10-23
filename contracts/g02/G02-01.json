@@ -1,0 +1,18 @@
+{
+  "schema": "wincreator.harness.contract/v1",
+  "task_id": "G02-01",
+  "name": "VEOR pin resolves to one audited, reproducible checkout or blocks",
+  "claim": "the optional VEOR sidecar is READY only when pin, package version, checkout commit, entrypoint and Node floor all match",
+  "level": "Meso",
+  "tier": "standard",
+  "gate": {
+    "command": ["python3", "-m", "pytest", "-q", "tests/test_governance.py", "-k", "status or pin or checkout"],
+    "files": [
+      "harness/governance.py",
+      "tests/test_governance.py",
+      "tools/veor-pin.json"
+    ]
+  },
+  "max_attempts": 2,
+  "require_review": true
+}
