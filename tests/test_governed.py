@@ -310,9 +310,12 @@ def test_a_private_key_in_the_verification_slot_executes_nothing(
     home, commit = _checkout(tmp_path)
     pin_path = _pin(tmp_path, home, commit)
     private_key = tmp_path / "private.pem"
+    # Built at runtime so the literal PEM block never appears in the repository
+    # and cannot trip a secret scanner. It contains no key material.
+    header = "-----BEGIN " + "PRIVATE KEY" + "-----"
+    footer = "-----END " + "PRIVATE KEY" + "-----"
     private_key.write_text(
-        "-----BEGIN PRIVATE KEY-----\nnot-for-verification\n-----END PRIVATE KEY-----\n",
-        encoding="utf-8",
+        f"{header}\nnot-for-verification\n{footer}\n", encoding="utf-8"
     )
     config = governed.GovernanceConfig.for_root(
         tmp_path, pin=str(pin_path), home=str(home), receipt_public_key=str(private_key)
