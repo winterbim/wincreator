@@ -32,7 +32,7 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 - `python3 tools/veor_gate.py` (real sidecar, real Ed25519 keys) → **7/7 pass**.
 - Full suite with `VEOR_HOME` set → **237 passed**; without it → 230 passed,
   7 skipped (the integration module skips rather than pretending).
-- Fresh captures at `2f4eb4a` for H01, H03, H04, H05, H07, G02-05 and G02-06:
+- Fresh captures at `c417671` for H01, H03, H04, H05, H07, G02-05 and G02-06:
   all `CAPTURED_PASS`, exit 0. `ledger_check.py` reports `CLEAN`;
   `wincreator verify` reports **no drift on the cited rows** and fails only on
   the seven `PENDING` rows (a passing gate is not a verdict). Older captures

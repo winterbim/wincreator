@@ -1,14 +1,14 @@
 {
   "schema": "wincreator.challenge-packet/v1",
   "payload": {
-    "attestation_digest": "7a94e8f6cad368c5bb8b6670883d6a6a5332aa649f5c1e296fc8bfaa93db1cd9",
+    "attestation_digest": "1e60559716cc024af492c75e81933cfca93a0724771b80913673971006c2a476",
     "claim": {
       "id": "H01",
       "level": "Meso",
       "text": "the G00 audit re-derives the repository baseline and every reference gate it executes passes",
       "gate": "`python3 -m harness audit --out .harness-artifacts/g00-audit-final.json --quiet`",
       "row_sha256": "8832b0895f7629af0e76e06c52d5e938243a866174f057152b03776431ce42aa",
-      "ledger_sha256_before": "2a4e4dddb4a113485931f43ede1c42addbc2daae3f750c71530fbdb60e6eaa22",
+      "ledger_sha256_before": "205eb747e11eb886337bc9cf2c0beb268f2baedb443f3f05f1885ae6514f02b5",
       "status_before": "PENDING"
     },
     "capture": {
@@ -52,8 +52,8 @@
     ],
     "git": {
       "available": true,
-      "commit": "2f4eb4a72b32ab6afca4085a6f810a2accb914cc",
-      "tree": "12e9eeffbca551506e0e4ff1e3862d0b2aa4c880",
+      "commit": "c4176711a8fc8562d814b55dc8fa8c8ba87d24bb",
+      "tree": "dbed0b1bd03765496bc19802cbb6c41dfe9adcd0",
       "branch": "feat/harness-runtime-v1",
       "dirty": false,
       "submodules": "",
@@ -65,5 +65,5 @@
       "private": false
     }
   },
-  "digest": "cd23a9cf7174c6edf58ebc8dec4dc4063345b3ed98e4a820d6b18775b543b593"
+  "digest": "19ec3422bb53ce8683c942b3b68e8f3bc33667cd1435d12d958f01c1d34a06dd"
 }

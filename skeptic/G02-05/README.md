@@ -7,12 +7,12 @@ streams.
 - Claim: a governed run executes only under a verified ALLOW and a bound receipt
 - Gate: `python3 -m pytest -q tests/test_governed.py`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (2372 ms)
-- Commit at capture: `2f4eb4a72b32ab6afca4085a6f810a2accb914cc`
+- Capture: CAPTURED_PASS exit=0 (2381 ms)
+- Commit at capture: `c4176711a8fc8562d814b55dc8fa8c8ba87d24bb`
 - Working tree at capture: dirty=True — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/G02-05/20261023T235300.813625Z-d6fcc69e-6d1b-491e-8d5e-45510b46928c/attestation.json`
-- Attestation sha256: `b45159dc263961ad283285e4e560d4dcf81c80c24b85cbb779e3f1fa1f9d723f`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/G02-05/20261023T235810.350719Z-a2a31698-bb47-47aa-ba2e-eacfd99d95c5/attestation.json`
+- Attestation sha256: `6cf2561b6a4ec8e272ff3b6fec8a8bbf040ca7eff013a99e2d8441b4dd5ba9f1`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files
