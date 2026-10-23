@@ -14,11 +14,12 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 | **Governed run**: decision → bound decision artifact → gate → signed receipt → offline verification → journal | `harness/governed.py` |
 | **Single-path enforcement**: a governed task cannot be run, retried, resumed or swept ungoverned | `harness/runtime.py` |
 | **Receipt re-verification inside `verify`** | `harness/runtime.py`, `harness/governed.py` |
+| Private-key refusal, verifier requirement, fail-closed `--require-sandbox` | `harness/governed.py`, `harness/runtime.py` |
 | CLI | `python3 -m harness run-governed`, `... verify --receipt-public-key` |
 | Reproducible pin | `tools/veor-pin.json` (commit `87a6fb3`, package `0.4.0-dev.6`, Node ≥ 22) |
 | Provisioning check + self-test (10 checks, incl. dirty checkout) | `tools/veor_check.py` |
 | Gate wrapper that fails instead of skipping when VEOR is absent | `tools/veor_gate.py` |
-| Hermetic adversarial suite (21 tests) | `tests/test_governed.py` |
+| Hermetic adversarial suite (24 tests) | `tests/test_governed.py` |
 | Real-VEOR integration suite (7 tests) | `tests/test_g02_integration.py` |
 | ADRs | `docs/adr/0001`–`0005` |
 
@@ -29,14 +30,14 @@ checkout; no G02 claim is `EVIDENCED`.** Every G02 ledger row stays `PENDING`
 - `python3 tools/veor_check.py` → `READY`, exit 0.
 - `python3 tools/veor_check.py --self-test` → **10/10**.
 - `python3 tools/veor_gate.py` (real sidecar, real Ed25519 keys) → **7/7 pass**.
-- Full suite with `VEOR_HOME` set → **227 passed**; without it → 220 passed,
+- Full suite with `VEOR_HOME` set → **237 passed**; without it → 230 passed,
   7 skipped (the integration module skips rather than pretending).
-- Fresh captures at `3167651472a639decf49ac17b835b21395e044e9` for H01, H03, H04,
-  H05, H07, G02-05 and G02-06: all `CAPTURED_PASS`, exit 0. `ledger_check.py`
-  reports `CLEAN`; `wincreator verify` reports **no file drift on the current
-  rows** and still fails on the seven `PENDING` rows (a passing gate is not a
-  verdict). Older captures retained on disk report drift because the code they
-  bound has since changed.
+- Fresh captures at `2f4eb4a` for H01, H03, H04, H05, H07, G02-05 and G02-06:
+  all `CAPTURED_PASS`, exit 0. `ledger_check.py` reports `CLEAN`;
+  `wincreator verify` reports **no drift on the cited rows** and fails only on
+  the seven `PENDING` rows (a passing gate is not a verdict). Older captures
+  retained on disk still show drift when inspected directly, which is expected
+  for history and no longer a verification failure.
 - What the integration suite actually proves:
   - `REVIEW` blocks execution, the challenge is journaled, nothing runs;
   - an operator-signed one-shot approval turns the same effect into `ALLOW`;

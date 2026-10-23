@@ -7,12 +7,12 @@ streams.
 - Claim: the G00 audit re-derives the repository baseline and every reference gate it executes passes
 - Gate: `python3 -m harness audit --out .harness-artifacts/g00-audit-final.json --quiet`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (13210 ms)
-- Commit at capture: `3167651472a639decf49ac17b835b21395e044e9`
-- Working tree at capture: dirty=True — the only modified path was
+- Capture: CAPTURED_PASS exit=0 (13542 ms)
+- Commit at capture: `2f4eb4a72b32ab6afca4085a6f810a2accb914cc`
+- Working tree at capture: dirty=False — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/H01/20261023T232431.290268Z-91301b2c-286b-464b-bd6b-4bd5bce28006/attestation.json`
-- Attestation sha256: `8b017366ab8d34731ea34d7d77773ae7f51f308a4995005003407e309bebf55e`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/H01/20261023T235243.059351Z-cc6db694-4b7f-4a83-9037-ff655c6b39bc/attestation.json`
+- Attestation sha256: `7a94e8f6cad368c5bb8b6670883d6a6a5332aa649f5c1e296fc8bfaa93db1cd9`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files

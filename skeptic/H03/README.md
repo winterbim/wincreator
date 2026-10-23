@@ -7,12 +7,12 @@ streams.
 - Claim: the runtime executes gates through the existing proof kernel and refuses SUCCEEDED without an EVIDENCED review
 - Gate: `python3 -m pytest -q tests/test_harness_runtime.py tests/test_harness_cli_audit.py`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (2316 ms)
-- Commit at capture: `3167651472a639decf49ac17b835b21395e044e9`
+- Capture: CAPTURED_PASS exit=0 (2405 ms)
+- Commit at capture: `2f4eb4a72b32ab6afca4085a6f810a2accb914cc`
 - Working tree at capture: dirty=True — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/H03/20261023T232444.609627Z-f77ac1cc-397b-4853-8979-d87ade08b4e6/attestation.json`
-- Attestation sha256: `b130e7952a02ddfbd68107dae9c91e793cf47594a865ac80c6c1683758c990c0`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/H03/20261023T235256.705446Z-bc0cb3a3-7560-4896-b194-6b4381918026/attestation.json`
+- Attestation sha256: `652440b4681f4ca8693d766181fa9948d96acb1776f016c4cc2e94f4c6b557cd`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files

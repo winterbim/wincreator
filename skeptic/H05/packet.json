@@ -1,14 +1,14 @@
 {
   "schema": "wincreator.challenge-packet/v1",
   "payload": {
-    "attestation_digest": "236a81cfe317c7fd0cdf43c1d522f28729527429a9175784b3e800038cccde2c",
+    "attestation_digest": "84ec43de92bf6a0e95b9ee8d77578ce810ea6776419131ab8d7f559af32d6dd4",
     "claim": {
       "id": "H05",
       "level": "Meso",
       "text": "the change introduces no regression in the existing WinCreator test suite",
       "gate": "`python3 -m pytest -q`",
       "row_sha256": "6cc1ee6e3d11536f3f6e0934c43f386e29267fc8ea4468aded8bc1f7e6922bdd",
-      "ledger_sha256_before": "72088d53ad9ef96ebde8c5a42143076531d448071c02f57cf1d637e72fc101ed",
+      "ledger_sha256_before": "28dd2dd2a431f2b0c97a2d4889514e813b367dcae42c08d9bca93740a71457cb",
       "status_before": "PENDING"
     },
     "capture": {
@@ -23,12 +23,12 @@
       "-q"
     ],
     "stdout": {
-      "sha256": "4daf1c09d803c192658832b2c5d81c4d7db0f046aa3807c606bf0983b4e69500",
+      "sha256": "175f2d33111b7ec11a01d18744af7698e65da29e7cf858f1221246775e332476",
       "original_bytes": 341,
       "stored_bytes": 341,
       "truncated": false,
       "body_stored": true,
-      "tail": "........................................................................ [ 31%]\n........................................................................ [ 63%]\n........................................................................ [ 95%]\n...........                                                              [100%]\n227 passed in 15.93s\n"
+      "tail": "........................................................................ [ 30%]\n........................................................................ [ 60%]\n........................................................................ [ 91%]\n.....................                                                    [100%]\n237 passed in 12.84s\n"
     },
     "stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -41,18 +41,18 @@
     "files": [],
     "git": {
       "available": true,
-      "commit": "3167651472a639decf49ac17b835b21395e044e9",
-      "tree": "2f5469cd553eeb94068e5e7d60d9e769f3a3c7ef",
+      "commit": "2f4eb4a72b32ab6afca4085a6f810a2accb914cc",
+      "tree": "12e9eeffbca551506e0e4ff1e3862d0b2aa4c880",
       "branch": "feat/harness-runtime-v1",
       "dirty": true,
       "submodules": "",
       "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
-      "worktree_digest": "396c60ff61616f89d596d2b628aec756b1c9e20c9e71bb80e0c3faaf55bfb5b3"
+      "worktree_digest": "99ca01eb7767976c98c87e694cfaf99d72c8a3bc16c15085dc80626ac9d2b52d"
     },
     "policy": {
       "tier": "standard",
       "private": false
     }
   },
-  "digest": "0a2e18bb6c59ea333d957e2eb9e5ea7a3b8989038b2008577f1e2182a16c96dc"
+  "digest": "592963a55cf7af6622c4556b1a5a37d55e1bce8e27c237cecde7278af8a6c3bc"
 }

@@ -7,12 +7,12 @@ streams.
 - Claim: the change introduces no regression in the existing WinCreator test suite
 - Gate: `python3 -m pytest -q`
 - Level / tier: Meso / standard
-- Capture: CAPTURED_PASS exit=0 (16147 ms)
-- Commit at capture: `3167651472a639decf49ac17b835b21395e044e9`
+- Capture: CAPTURED_PASS exit=0 (13062 ms)
+- Commit at capture: `2f4eb4a72b32ab6afca4085a6f810a2accb914cc`
 - Working tree at capture: dirty=True — the only modified path was
   `PROOF_LEDGER-harness.md`, written by the capture itself
-- Authoritative attestation (local, gitignored): `.wincreator/attestations/H05/20261023T232454.258778Z-cab38ee3-0395-453d-81f0-8f25ee3af52b/attestation.json`
-- Attestation sha256: `236a81cfe317c7fd0cdf43c1d522f28729527429a9175784b3e800038cccde2c`
+- Authoritative attestation (local, gitignored): `.wincreator/attestations/H05/20261023T235306.513408Z-b248efa7-eee4-4a0c-b32b-ea9e9e0b2e18/attestation.json`
+- Attestation sha256: `84ec43de92bf6a0e95b9ee8d77578ce810ea6776419131ab8d7f559af32d6dd4`
 - Review schema expected: `wincreator.review/v3`
 
 ## Files

@@ -1,0 +1,78 @@
+{
+  "schema": "wincreator.challenge-packet/v1",
+  "payload": {
+    "attestation_digest": "18974ed3d9a9a7b27ba2566608f41b13033a7b26178664d2a6786120c1dbb08a",
+    "claim": {
+      "id": "G02-06",
+      "level": "Meso",
+      "text": "the governed path works against the real pinned VEOR checkout",
+      "gate": "`python3 tools/veor_gate.py`",
+      "row_sha256": "5425c074ad515f899a080c97f59c2f4b3ebec3f5e0956f14073f53d24a20eeb9",
+      "ledger_sha256_before": "b2a19eebbcee3afa90c1c751da25cedb534ee7690340be3dfdc05e7c33f07055",
+      "status_before": "PENDING"
+    },
+    "capture": {
+      "status": "CAPTURED_PASS",
+      "exit_code": 0,
+      "error": null
+    },
+    "command": [
+      "python3",
+      "tools/veor_gate.py"
+    ],
+    "stdout": {
+      "sha256": "ab30ad633bbcf8bead122a6abc1ef8bda7255e1d2ac02f4c3ea6998c24596b7e",
+      "original_bytes": 98,
+      "stored_bytes": 98,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ".......                                                                  [100%]\n7 passed in 2.90s\n"
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_bytes": 0,
+      "stored_bytes": 0,
+      "truncated": false,
+      "body_stored": true,
+      "tail": ""
+    },
+    "files": [
+      {
+        "path": "tests/test_g02_integration.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "e2f7d0085571c67df88a4dd55a350ac0442e5dd54761a8f795c4d556eda66ad4",
+        "bytes": 13005
+      },
+      {
+        "path": "tools/veor_gate.py",
+        "optional": false,
+        "missing": false,
+        "sha256": "14ed55c2c0b523d038a788f1e283e7178f9fe81d220ddafbe6b93c19ffda6403",
+        "bytes": 949
+      },
+      {
+        "path": "tools/veor-pin.json",
+        "optional": false,
+        "missing": false,
+        "sha256": "a35b9c23fe6ab1f96070a27d487d8be52d642f2b83bbd7a98e7c5d4951631e3e",
+        "bytes": 711
+      }
+    ],
+    "git": {
+      "available": true,
+      "commit": "2f4eb4a72b32ab6afca4085a6f810a2accb914cc",
+      "tree": "12e9eeffbca551506e0e4ff1e3862d0b2aa4c880",
+      "branch": "feat/harness-runtime-v1",
+      "dirty": true,
+      "submodules": "",
+      "untracked_digest": "9ab6c53e9939411269e8b0bf7c78f0e82dba821459fcf1f85e4bef606f821057",
+      "worktree_digest": "9a6d806d0df919571445bb5cb300cae3f8e74de8d28745e816865a99000499f3"
+    },
+    "policy": {
+      "tier": "standard",
+      "private": false
+    }
+  },
+  "digest": "5d89864da6ea265dd94c3e88a3e128e5bf26467c12a6c97176aba54ee7a2a498"
+}

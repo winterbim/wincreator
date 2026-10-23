@@ -23,7 +23,8 @@ Skeptic verdict was produced.
 - `wincreator verify --ledger PROOF_LEDGER-harness.md` → **22 captures**
   integrity-checked; **no drift failures**; exit 1 only for the **7 PENDING**
   rows (a green gate is not a verdict).
-- Full suite with `VEOR_HOME` set → see the final capture; every gate green.
+- Full suite with `VEOR_HOME` set → **237 passed**; without it → **230 passed,
+  7 skipped**.
 - Real ON/OFF benchmark: 8 Codex runs, OFF 4/4 and ON 4/4, with duration,
   tokens and token-equivalent cost recorded in `docs/BENCH_G03.md`.
 
