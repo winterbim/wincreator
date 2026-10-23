@@ -182,6 +182,16 @@ def test_run_refuses_a_task_that_already_succeeded(harness_executor):
         harness_executor.run(contract.task_id)
 
 
+def test_pid_liveness_reports_a_dead_owner_as_dead():
+    from harness.util import pid_alive
+
+    assert pid_alive(None) is False
+    assert pid_alive(0) is False
+    assert pid_alive(-5) is False
+    assert pid_alive(999_999_999) is False
+    assert pid_alive(os.getpid()) is True
+
+
 def test_resume_recovers_an_attempt_whose_owner_is_gone(harness_executor):
     contract = harness_contract(tier="lite", max_attempts=2)
     harness_executor.register(contract)

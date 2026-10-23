@@ -7,6 +7,7 @@ receipts and its offline verifier are exercised in ``test_g02_integration.py``.
 
 import json
 import os
+import sys
 import uuid
 
 import pytest
@@ -322,7 +323,9 @@ def test_governed_task_cannot_be_run_or_retried_ungoverned(harness_executor, veo
 
 def test_a_governed_retry_needs_a_reason_and_a_new_decision(harness_executor, veor_env):
     harness_executor.register(
-        harness_contract(tier="lite", command=["python3", "-c", "raise SystemExit(3)"])
+        harness_contract(
+            tier="lite", command=[sys.executable, "-c", "raise SystemExit(3)"]
+        )
     )
     first = _run(harness_executor, veor_env)
     assert first["state"] == "FAILED"
@@ -366,7 +369,7 @@ def test_the_decision_artifact_holds_no_raw_arguments(harness_executor, veor_env
     harness_executor.register(
         harness_contract(
             tier="lite",
-            command=["python3", "-c", "print('ok')", "--token=SECRET-VALUE-42"],
+            command=[sys.executable, "-c", "print('ok')", "--token=SECRET-VALUE-42"],
         )
     )
 

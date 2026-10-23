@@ -65,11 +65,52 @@ def atomic_write_json(path, document):
     return path
 
 
+def _windows_pid_alive(pid):
+    """Query the process handle instead of assuming it lives.
+
+    ``OpenProcess`` also works for processes this user cannot signal, which is
+    the case ``os.kill(pid, 0)`` cannot distinguish from a dead owner.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    ERROR_ACCESS_DENIED = 5
+    ERROR_INVALID_PARAMETER = 87
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        error = ctypes.get_last_error()
+        if error == ERROR_ACCESS_DENIED:
+            return True  # alive, but owned by another user
+        if error == ERROR_INVALID_PARAMETER:
+            return False  # no such process
+        return True  # unknown failure: stay conservative, the lease still applies
+    try:
+        code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return True
+        return code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def pid_alive(pid):
     """Best-effort liveness probe for a run owner.
 
-    On Windows there is no stdlib-only probe that avoids ctypes, so the lease
-    alone decides there; the caller documents that limit.
+    Best effort means a reused pid can look alive; the lease is the backstop.
     """
     if pid is None:
         return False
@@ -79,14 +120,18 @@ def pid_alive(pid):
         return False
     if pid <= 0:
         return False
-    if os.name == "nt":  # pragma: no cover - exercised by the Windows CI job
-        return True
+    if os.name == "nt":
+        if pid > 0xFFFFFFFF:
+            return False
+        return _windows_pid_alive(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         return True
+    except OverflowError:
+        return False
     except OSError:
         return False
     return True

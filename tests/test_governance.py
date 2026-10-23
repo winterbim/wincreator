@@ -1,8 +1,11 @@
 import ast
 import dataclasses
 import json
+import os
 import shutil
+import stat
 import subprocess
+import sys
 
 import pytest
 
@@ -25,6 +28,21 @@ PIN_TEMPLATE = {
     },
     "vendored": False,
 }
+
+
+def _force_writable(function, path, _error):
+    # Git marks objects read-only, and Windows refuses to delete those.
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def _remove_tree(path):
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_force_writable)
+    else:  # onerror takes exc_info instead of the exception on <= 3.11
+        shutil.rmtree(
+            path, onerror=lambda f, p, _info: _force_writable(f, p, None)
+        )
 
 
 def _checkout(tmp_path, version="0.4.0-dev.6"):
@@ -135,7 +153,7 @@ def test_status_blocks_when_the_checkout_is_modified(tmp_path):
 
 def test_status_blocks_without_git_metadata(tmp_path):
     home, commit = _checkout(tmp_path)
-    shutil.rmtree(home / ".git")
+    _remove_tree(home / ".git")
     status = governance.check(
         str(_pin_file(tmp_path, commit)), home=str(home), node_version_override="v22.1.0"
     )
