@@ -87,6 +87,14 @@ class Executor:
 
     def run(self, task_id, extra_files=(), on_capture=None, governed=False):
         task = self.store.get_task(task_id)
+        if governed and on_capture is None:
+            # The flag alone is an caller assertion. Without a verifier nothing
+            # checks the VEOR receipt, so this is an ungoverned execution
+            # wearing a governed label. Refuse it.
+            raise InvalidTransition(
+                f"task {task_id}: governed execution requires a capture verifier; "
+                "use the governance path"
+            )
         if not governed and self._is_governed(task_id):
             raise InvalidTransition(
                 f"task {task_id} is governed and must run through the governance path; "

@@ -147,6 +147,7 @@ def cmd_run_governed(args):
         node=args.node,
         receipt_public_key=args.receipt_public_key,
         timeout=args.timeout,
+        require_sandbox=getattr(args, "require_sandbox", False),
     )
     task_ids = list(args.task_ids)
     if not task_ids:
@@ -400,6 +401,12 @@ def build_parser():
         "--receipt-public-key", dest="receipt_public_key", default=None
     )
     run_governed.add_argument("--timeout", type=float, default=60.0)
+    run_governed.add_argument(
+        "--require-sandbox",
+        dest="require_sandbox",
+        action="store_true",
+        help="refuse to run unless OS isolation exists (none is implemented today)",
+    )
     run_governed.add_argument(
         "--advisory", default="ALLOW", choices=("ALLOW", "REVIEW", "DENY")
     )

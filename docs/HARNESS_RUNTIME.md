@@ -237,7 +237,17 @@ Governed path (G02) specifically:
 
 - a governed gate still runs as a plain child process: no sandbox, no OS
   isolation. The receipt says `sandbox: none / os_enforced: false`, and the
-  decision artifact records the same, because it is true.
+  decision artifact records the same, because it is true. The
+  `--require-sandbox` flag (or `WINCREATOR_REQUIRE_SANDBOX=1`) refuses instead
+  of pretending, leaving the task `BLOCKED` with `SANDBOX_UNAVAILABLE`.
+- the receipt verification key must be a PEM public key. A file containing
+  private key material is refused with `RECEIPT_KEY_INVALID` before the sidecar
+  starts, so a custody mistake cannot leak a key into logs or argv.
+- `Executor.run(..., governed=True)` without a capture verifier is refused: the
+  flag alone is an assertion, not proof that a receipt was checked.
+- `docs/adr/0006-governance-threat-model.md` lists every bypass vector and
+  whether it is closed, partial or an explicit non-claim (shell, MCP, same-user
+  Python caller, OS isolation).
 - the receipt proves that the holder of the receipt key decided and executed
   this args digest. It does not prove *which* checkout signed it, and there is no
   remote attestation.

@@ -69,7 +69,9 @@ def _sidecar_config(tmp_path, script, timeout=60):
     home, commit = _sidecar_checkout(tmp_path, script)
     pin_path = _pin(tmp_path, home, commit)
     key = tmp_path / "receipt.pub.pem"
-    key.write_text("x", encoding="utf-8")
+    key.write_text(
+        "-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----\n", encoding="utf-8"
+    )
     return governed.GovernanceConfig.for_root(
         tmp_path,
         pin=str(pin_path),
@@ -300,6 +302,64 @@ def test_a_malformed_sidecar_response_executes_nothing(harness_executor, tmp_pat
     assert harness_executor.store.events("H1")[-1]["payload"]["code"] == (
         "GOVERNANCE_UNAVAILABLE"
     )
+
+
+def test_a_private_key_in_the_verification_slot_executes_nothing(
+    harness_executor, tmp_path, monkeypatch
+):
+    home, commit = _checkout(tmp_path)
+    pin_path = _pin(tmp_path, home, commit)
+    private_key = tmp_path / "private.pem"
+    private_key.write_text(
+        "-----BEGIN PRIVATE KEY-----\nnot-for-verification\n-----END PRIVATE KEY-----\n",
+        encoding="utf-8",
+    )
+    config = governed.GovernanceConfig.for_root(
+        tmp_path, pin=str(pin_path), home=str(home), receipt_public_key=str(private_key)
+    )
+    monkeypatch.setattr(governance, "node_version", lambda: "v22.3.0")
+    harness_executor.register(harness_contract(tier="lite"))
+
+    with pytest.raises(GovernanceUnavailable, match="private key material"):
+        governed.run(harness_executor, "H1", config)
+
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.get_task("H1").state == "PENDING"
+    assert harness_executor.store.events("H1")[-1]["payload"]["code"] == (
+        "RECEIPT_KEY_INVALID"
+    )
+
+
+def test_requiring_os_isolation_refuses_instead_of_pretending(
+    harness_executor, veor_env
+):
+    config = governed.GovernanceConfig(
+        pin_path=veor_env["config"].pin_path,
+        home=veor_env["config"].home,
+        receipt_public_key=veor_env["config"].receipt_public_key,
+        require_sandbox=True,
+    )
+    harness_executor.register(harness_contract(tier="lite"))
+
+    with pytest.raises(GovernanceUnavailable, match="OS isolation was required"):
+        governed.run(harness_executor, "H1", config)
+
+    assert veor_env["veor"].calls == []
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.events("H1")[-1]["payload"]["code"] == (
+        "SANDBOX_UNAVAILABLE"
+    )
+
+
+def test_a_governed_flag_without_a_receipt_verifier_is_refused(harness_executor):
+    harness_executor.register(harness_contract(tier="lite"))
+
+    with pytest.raises(InvalidTransition, match="capture verifier"):
+        harness_executor.run("H1", governed=True)
+
+    assert harness_executor.store.latest_proof("H1") is None
+    assert harness_executor.store.get_task("H1").state == "PENDING"
+    assert harness_executor.store.get_task("H1").attempts == ()
 
 
 def test_a_modified_checkout_with_the_pinned_head_executes_nothing(

@@ -50,6 +50,8 @@ GATE_TOOL = "wincreator.gate.execute"
 GATE_ANNOTATIONS = {"readOnlyHint": False, "destructiveHint": True}
 PIN_ENV = "WINCREATOR_VEOR_PIN"
 PUBLIC_KEY_ENV = "VEOR_RECEIPT_PUBLIC_KEY"
+SANDBOX_ENV = "WINCREATOR_REQUIRE_SANDBOX"
+PUBLIC_KEY_HEADER = "-----BEGIN PUBLIC KEY-----"
 _RECEIPT_KIND = "veor.execution-receipt/v1"
 
 
@@ -66,6 +68,7 @@ class GovernanceConfig:
     node: str = "node"
     receipt_public_key: Optional[str] = None
     timeout: float = 60.0
+    require_sandbox: bool = False
     sidecar_env: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -77,8 +80,15 @@ class GovernanceConfig:
         node=None,
         receipt_public_key=None,
         timeout=None,
+        require_sandbox=None,
         sidecar_env=None,
     ):
+        if require_sandbox is None:
+            require_sandbox = os.environ.get(SANDBOX_ENV, "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+            }
         return cls(
             pin_path=os.path.abspath(
                 pin
@@ -90,6 +100,7 @@ class GovernanceConfig:
             receipt_public_key=receipt_public_key
             or os.environ.get(PUBLIC_KEY_ENV),
             timeout=float(timeout or 60.0),
+            require_sandbox=bool(require_sandbox),
             sidecar_env=dict(sidecar_env or {}),
         )
 
@@ -97,6 +108,30 @@ class GovernanceConfig:
 # --------------------------------------------------------------- small helpers
 def _file_sha256(path):
     return file_digest(path)
+
+
+def public_key_problem(path):
+    """Refuse anything that is not a PEM public key, especially a private key.
+
+    The verification key is handed to VEOR's verifier and may end up in logs or
+    argv. A private key in that slot would be a custody failure, so it is
+    rejected before the sidecar starts.
+    """
+    if not path or not os.path.isfile(path):
+        return "receipt public key is missing or unreadable"
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            text = handle.read(64 * 1024)
+    except OSError as error:
+        return f"cannot read the receipt public key: {error}"
+    if "PRIVATE KEY" in text:
+        return (
+            "the receipt verification key contains private key material; pass the "
+            "public key only"
+        )
+    if PUBLIC_KEY_HEADER not in text:
+        return "the receipt verification key is not a PEM public key"
+    return None
 
 
 def _same_path(left, right):
@@ -326,11 +361,9 @@ def verify_task(executor, task_id, config):
             f"(last governance event: {latest['type']})"
         ]
     record = bound[-1]["payload"]
-    if not config.receipt_public_key or not os.path.isfile(config.receipt_public_key):
-        return [
-            f"{task_id}: cannot re-verify the VEOR receipt: no readable public key "
-            f"(set {PUBLIC_KEY_ENV} or pass the receipt public key)"
-        ]
+    key_problem = public_key_problem(config.receipt_public_key)
+    if key_problem:
+        return [f"{task_id}: cannot re-verify the VEOR receipt: {key_problem}"]
     try:
         with open(config.pin_path, encoding="utf-8") as handle:
             pin = governance.load_pin(config.pin_path)
@@ -393,18 +426,33 @@ def run(executor, task_id, config, advisory="ALLOW", retry_reason=None):
         raise governance.GovernanceUnavailable(
             "governance is not READY: " + "; ".join(status.reasons)
         )
-    if not config.receipt_public_key or not os.path.isfile(config.receipt_public_key):
+    if config.require_sandbox:
         _block(
             store,
             task_id,
-            "RECEIPT_KEY_MISSING",
+            "SANDBOX_UNAVAILABLE",
             [
-                "no readable receipt verification key; a receipt could not be "
-                f"verified, so nothing is executed (set {PUBLIC_KEY_ENV})"
+                "this run requires OS isolation, but no sandbox backend is "
+                "implemented; refusing rather than claiming protection it does "
+                "not have"
             ],
         )
         raise governance.GovernanceUnavailable(
-            "a receipt public key is required before a governed run"
+            "OS isolation was required, but the governed path runs gates as plain "
+            "child processes (sandbox=none)"
+        )
+
+    key_problem = public_key_problem(config.receipt_public_key)
+    if key_problem:
+        code = (
+            "RECEIPT_KEY_MISSING"
+            if not config.receipt_public_key
+            or not os.path.isfile(config.receipt_public_key)
+            else "RECEIPT_KEY_INVALID"
+        )
+        _block(store, task_id, code, [key_problem])
+        raise governance.GovernanceUnavailable(
+            f"a usable receipt public key is required before a governed run: {key_problem}"
         )
 
     effect = effect_for(task.contract, workspace=task.workspace)
