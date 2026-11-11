@@ -1,9 +1,110 @@
 {
   "schema": "wincreator.ablation-manifest/v1",
   "cases": [
-    {"id":"001-boundary","task":"cases/001-boundary/task.md","seed":"cases/001-boundary/seed","grader":"cases/001-boundary/grader.py","timeout_seconds":600},
-    {"id":"002-escaped-table","task":"cases/002-escaped-table/task.md","seed":"cases/002-escaped-table/seed","grader":"cases/002-escaped-table/grader.py","timeout_seconds":600},
-    {"id":"003-stable-unique","task":"cases/003-stable-unique/task.md","seed":"cases/003-stable-unique/seed","grader":"cases/003-stable-unique/grader.py","timeout_seconds":600},
-    {"id":"004-config-precedence","task":"cases/004-config-precedence/task.md","seed":"cases/004-config-precedence/seed","grader":"cases/004-config-precedence/grader.py","timeout_seconds":600}
+    {
+      "id": "001-boundary",
+      "task": "cases/001-boundary/task.md",
+      "seed": "cases/001-boundary/seed",
+      "grader": "cases/001-boundary/grader.py",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "002-escaped-table",
+      "task": "cases/002-escaped-table/task.md",
+      "seed": "cases/002-escaped-table/seed",
+      "grader": "cases/002-escaped-table/grader.py",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "003-stable-unique",
+      "task": "cases/003-stable-unique/task.md",
+      "seed": "cases/003-stable-unique/seed",
+      "grader": "cases/003-stable-unique/grader.py",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "004-config-precedence",
+      "task": "cases/004-config-precedence/task.md",
+      "seed": "cases/004-config-precedence/seed",
+      "grader": "cases/004-config-precedence/grader.py",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "005-csv-roundtrip",
+      "task": "cases/005-csv-roundtrip/task.md",
+      "seed": "cases/005-csv-roundtrip/seed",
+      "grader": "cases/005-csv-roundtrip/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "006-retry-contract",
+      "task": "cases/006-retry-contract/task.md",
+      "seed": "cases/006-retry-contract/seed",
+      "grader": "cases/006-retry-contract/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "007-pagination",
+      "task": "cases/007-pagination/task.md",
+      "seed": "cases/007-pagination/seed",
+      "grader": "cases/007-pagination/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "008-split-amount",
+      "task": "cases/008-split-amount/task.md",
+      "seed": "cases/008-split-amount/seed",
+      "grader": "cases/008-split-amount/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "009-slugify",
+      "task": "cases/009-slugify/task.md",
+      "seed": "cases/009-slugify/seed",
+      "grader": "cases/009-slugify/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "010-unreachable-service",
+      "task": "cases/010-unreachable-service/task.md",
+      "seed": "cases/010-unreachable-service/seed",
+      "grader": "cases/010-unreachable-service/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "011-missing-oracle",
+      "task": "cases/011-missing-oracle/task.md",
+      "seed": "cases/011-missing-oracle/seed",
+      "grader": "cases/011-missing-oracle/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "012-wrong-target",
+      "task": "cases/012-wrong-target/task.md",
+      "seed": "cases/012-wrong-target/seed",
+      "grader": "cases/012-wrong-target/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "013-buried-amendment",
+      "task": "cases/013-buried-amendment/task.md",
+      "seed": "cases/013-buried-amendment/seed",
+      "grader": "cases/013-buried-amendment/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "014-flaky-gate",
+      "task": "cases/014-flaky-gate/task.md",
+      "seed": "cases/014-flaky-gate/seed",
+      "grader": "cases/014-flaky-gate/grader.py",
+      "timeout_seconds": 900
+    },
+    {
+      "id": "015-mocked-away",
+      "task": "cases/015-mocked-away/task.md",
+      "seed": "cases/015-mocked-away/seed",
+      "grader": "cases/015-mocked-away/grader.py",
+      "timeout_seconds": 900
+    }
   ]
 }
