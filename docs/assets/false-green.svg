@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 500" role="img" aria-labelledby="title desc">
+  <title id="title">A green test that proves nothing, caught by WinCreator</title>
+  <desc id="desc">Terminal transcript: a check passes, the bug the claim is about is seeded and the check still passes, so the verdict is INSUFFICIENT. One added check kills the fault and the verdict becomes ADEQUATE.</desc>
+  <defs>
+    <style>
+      .m { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; }
+      .cmd { fill: #f8fafc; font-weight: 600; }
+      .out { fill: #cbd5e1; }
+      .note { fill: #7c8aa0; }
+      .claim { fill: #7dd3fc; font-weight: 600; }
+      .bad { fill: #fb7185; font-weight: 700; }
+      .good { fill: #34d399; font-weight: 700; }
+      .bar { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 12px; fill: #7c8aa0; }
+      @keyframes l0 { 0%, 0.00% { opacity: 0; } 1.20%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l0 { animation: l0 21.00s linear infinite; }
+      @keyframes l1 { 0%, 3.81% { opacity: 0; } 5.01%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l1 { animation: l1 21.00s linear infinite; }
+      @keyframes l2 { 0%, 7.62% { opacity: 0; } 8.82%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l2 { animation: l2 21.00s linear infinite; }
+      @keyframes l3 { 0%, 11.43% { opacity: 0; } 12.63%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l3 { animation: l3 21.00s linear infinite; }
+      @keyframes l4 { 0%, 15.24% { opacity: 0; } 16.44%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l4 { animation: l4 21.00s linear infinite; }
+      @keyframes l5 { 0%, 19.05% { opacity: 0; } 20.25%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l5 { animation: l5 21.00s linear infinite; }
+      @keyframes l6 { 0%, 22.86% { opacity: 0; } 24.06%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l6 { animation: l6 21.00s linear infinite; }
+      @keyframes l7 { 0%, 26.67% { opacity: 0; } 27.87%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l7 { animation: l7 21.00s linear infinite; }
+      @keyframes l8 { 0%, 30.48% { opacity: 0; } 31.68%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l8 { animation: l8 21.00s linear infinite; }
+      @keyframes l9 { 0%, 34.29% { opacity: 0; } 35.49%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l9 { animation: l9 21.00s linear infinite; }
+      @keyframes l10 { 0%, 38.10% { opacity: 0; } 39.30%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l10 { animation: l10 21.00s linear infinite; }
+      @keyframes l11 { 0%, 41.90% { opacity: 0; } 43.10%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l11 { animation: l11 21.00s linear infinite; }
+      @keyframes l12 { 0%, 45.71% { opacity: 0; } 46.91%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l12 { animation: l12 21.00s linear infinite; }
+      @keyframes l13 { 0%, 49.52% { opacity: 0; } 50.72%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l13 { animation: l13 21.00s linear infinite; }
+      @keyframes l14 { 0%, 53.33% { opacity: 0; } 54.53%, 97% { opacity: 1; } 100% { opacity: 0; } }
+      .l14 { animation: l14 21.00s linear infinite; }
+      @media (prefers-reduced-motion: reduce) { .m { animation: none !important; opacity: 1 !important; } }
+    </style>
+  </defs>
+  <rect width="820" height="500" rx="12" fill="#0b1220"/>
+  <rect width="820" height="34" rx="12" fill="#111a2e"/>
+  <rect y="22" width="820" height="12" fill="#111a2e"/>
+  <circle cx="22" cy="17" r="5.5" fill="#fb7185"/>
+  <circle cx="40" cy="17" r="5.5" fill="#fbbf24"/>
+  <circle cx="58" cy="17" r="5.5" fill="#34d399"/>
+  <text x="410" y="21" text-anchor="middle" class="bar">python3 examples/false-green/run_demo.py</text>
+  <text x="24" y="58" class="m claim l0" xml:space="preserve">CLAIM   a refund never exceeds what was paid</text>
+  <text x="24" y="100" class="m cmd l1" xml:space="preserve">$ python3 check_weak.py</text>
+  <text x="24" y="121" class="m out l2" xml:space="preserve">2 checks passed   (exit 0)</text>
+  <text x="24" y="142" class="m note l3" xml:space="preserve">        green. This is where an agent says &quot;done&quot;.</text>
+  <text x="24" y="184" class="m note l4" xml:space="preserve">seed the bug the claim is about:  min(requested, paid)  -&gt;  requested</text>
+  <text x="24" y="205" class="m cmd l5" xml:space="preserve">$ python3 check_weak.py            # against the broken code</text>
+  <text x="24" y="226" class="m out l6" xml:space="preserve">2 checks passed   (exit 0)</text>
+  <text x="24" y="247" class="m note l7" xml:space="preserve">        still green: the fault SURVIVED.</text>
+  <text x="24" y="289" class="m bad l8" xml:space="preserve">VERDICT INSUFFICIENT</text>
+  <text x="24" y="310" class="m note l9" xml:space="preserve">        the gate passed, but it cannot detect the failure it is cited against.</text>
+  <text x="24" y="352" class="m cmd l10" xml:space="preserve">$ python3 check_strong.py          # one added check, same broken code</text>
+  <text x="24" y="373" class="m out l11" xml:space="preserve">AssertionError: refund exceeded the amount paid   (exit 1)</text>
+  <text x="24" y="394" class="m note l12" xml:space="preserve">        red: the fault is KILLED.</text>
+  <text x="24" y="436" class="m good l13" xml:space="preserve">VERDICT ADEQUATE</text>
+  <text x="24" y="457" class="m note l14" xml:space="preserve">        now a green run of this gate is evidence for the claim.</text>
+</svg>

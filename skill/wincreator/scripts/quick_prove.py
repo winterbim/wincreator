@@ -68,6 +68,33 @@ def ensure_claim(ledger_path, claim_id, claim_text, command):
     return ledger_path
 
 
+def _review_commands(claim_id, attestation_path, ledger):
+    """Exact, copy-pasteable follow-up for a Standard capture.
+
+    The reviewer must not be the Builder; the reviewer ID and the challenge text
+    are left as placeholders on purpose so they cannot be pasted blindly.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    packet = os.path.join(os.path.dirname(os.path.abspath(attestation_path)), "challenge-packet.json")
+    python = "python3" if os.name != "nt" else "python"
+
+    def quote(value):
+        if os.name == "nt":
+            return f'"{value}"'
+        relative = os.path.relpath(value)
+        return shlex.quote(value if relative.startswith("..") else relative)
+
+    packet_tool = quote(os.path.join(script_dir, "challenge_packet.py"))
+    cli = quote(os.path.join(script_dir, "wincreator.py"))
+    return [
+        f"  {python} {packet_tool} create --attestation {quote(attestation_path)} --out {quote(packet)}",
+        f"  {python} {cli} review {claim_id} --ledger {quote(ledger)} "
+        f"--challenge-packet {quote(packet)} "
+        "--verdict <evidenced|insufficient|disproven> --reviewer <reviewer-id> "
+        '--challenge "<the concrete attack you tried against the claim>"',
+    ]
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="wincreator-quick",
@@ -134,7 +161,9 @@ def main(argv=None):
     print(f"[ATTESTATION] {path} sha256={attestation['digest']['value']}")
     print(f"[LEDGER] {ledger}")
     if args.tier == "standard" and capture["status"] == "CAPTURED_PASS":
-        print("[NEXT] independent review required before EVIDENCED")
+        print("[NEXT] independent review required before EVIDENCED. Hand these to the reviewer:")
+        for line in _review_commands(claim_id, path, ledger):
+            print(line)
     return code
 
 

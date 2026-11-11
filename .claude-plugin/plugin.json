@@ -1,0 +1,14 @@
+{
+  "name": "wincreator",
+  "displayName": "WinCreator",
+  "description": "Proof protocol for agent work: claims become ledger rows with a captured gate and an independent review, and a Done Gate stops the agent from reporting done while unproven claims remain.",
+  "author": {
+    "name": "Winter Fernandes",
+    "url": "https://github.com/winterbim"
+  },
+  "homepage": "https://github.com/winterbim/wincreator#readme",
+  "repository": "https://github.com/winterbim/wincreator",
+  "license": "MIT",
+  "keywords": ["verification", "proof", "testing", "agent-skill", "stop-hook"],
+  "skills": ["./skill/"]
+}

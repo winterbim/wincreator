@@ -79,3 +79,51 @@ def test_quick_initializes_precreated_empty_ledger(tmp_path):
     assert "| ID | Level | Claim | Gate (what proves it) | Status | Evidence |" in text
     assert "empty ledger is initialized" in text
     assert "EVIDENCED" in text
+
+
+def test_quick_standard_capture_verifies_from_the_project_directory(tmp_path, monkeypatch, capsys):
+    """Regression: the default quick ledger lives in .wincreator/, not in the cwd.
+
+    Capture evidence used to be written relative to the cwd while `verify`
+    re-derived it relative to the ledger, so every un-reviewed quick capture was
+    reported as an unidentifiable proof chain instead of an honest PENDING.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    quick = load_quick(repo_root)
+    monkeypatch.chdir(tmp_path)
+
+    code = quick.main([
+        "python executes successfully",
+        "--tier", "standard",
+        "--",
+        sys.executable, "-c", "print('ok')",
+    ])
+    assert code == 0
+    printed = capsys.readouterr().out
+    assert "challenge_packet.py" in printed and "--challenge-packet" in printed
+
+    import wincreator
+    checked, problems = wincreator.verify_ledger_references(
+        str(Path.cwd() / ".wincreator" / "PROOF_LEDGER.md")
+    )
+    assert checked == 1
+    assert len(problems) == 1 and "is PENDING" in problems[0], problems
+
+
+def test_quick_failing_gate_verifies_as_disproven(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    quick = load_quick(repo_root)
+    monkeypatch.chdir(tmp_path)
+
+    code = quick.main([
+        "python exits zero",
+        "--",
+        sys.executable, "-c", "raise SystemExit(3)",
+    ])
+    assert code == 3
+
+    import wincreator
+    _checked, problems = wincreator.verify_ledger_references(
+        str(Path.cwd() / ".wincreator" / "PROOF_LEDGER.md")
+    )
+    assert len(problems) == 1 and "is DISPROVEN" in problems[0], problems

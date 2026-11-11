@@ -1,0 +1,47 @@
+name: "WinCreator Done Gate"
+description: "Fail the job while the Proof Ledger still holds unproven claims (CLAIMED, DISPROVEN, INSUFFICIENT)."
+author: "Winter Fernandes"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  ledger:
+    description: >-
+      Ledger file(s) to gate, separated by spaces or newlines. Default: discover
+      PROOF_LEDGER.md, PROOF_LEDGER-*.md and .wincreator/PROOF_LEDGER.md under `root`.
+    required: false
+    default: ""
+  root:
+    description: "Project root used for ledger discovery."
+    required: false
+    default: "."
+  strict-attestation:
+    description: "Require machine-captured attestations on EVIDENCED/DISPROVEN rows (Regulated tier)."
+    required: false
+    default: "false"
+  require-ledger:
+    description: "Fail when no ledger is found instead of passing."
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check the Proof Ledger
+      shell: bash
+      env:
+        WC_LEDGER: ${{ inputs.ledger }}
+        WC_ROOT: ${{ inputs.root }}
+        WC_STRICT: ${{ inputs.strict-attestation }}
+        WC_REQUIRE: ${{ inputs.require-ledger }}
+      run: |
+        python_bin="$(command -v python3 || command -v python)"
+        args=(--root "$WC_ROOT" --summary "$GITHUB_STEP_SUMMARY")
+        if [ "$WC_STRICT" = "true" ]; then args+=(--strict-attestation); fi
+        if [ "$WC_REQUIRE" = "true" ]; then args+=(--require-ledger); fi
+        ledgers=()
+        while IFS= read -r entry; do
+          if [ -n "$entry" ]; then ledgers+=("$entry"); fi
+        done < <(printf '%s\n' "$WC_LEDGER" | tr ' ' '\n')
+        "$python_bin" "$GITHUB_ACTION_PATH/skill/wincreator/scripts/done_gate.py" "${args[@]}" "${ledgers[@]}"

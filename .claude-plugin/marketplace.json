@@ -1,0 +1,15 @@
+{
+  "name": "wincreator",
+  "description": "WinCreator: proof gates for agent work.",
+  "owner": {
+    "name": "Winter Fernandes",
+    "url": "https://github.com/winterbim"
+  },
+  "plugins": [
+    {
+      "name": "wincreator",
+      "source": "./",
+      "description": "The WinCreator skill plus the Done Gate stop hook."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+name: False green caught (or missed)
+description: Share a case where a passing check did not prove the claim
+labels: ["catch"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Real catches are how this project improves. A case WinCreator caught is useful;
+        a case it missed is more useful.
+  - type: textarea
+    id: claim
+    attributes:
+      label: The claim
+    validations:
+      required: true
+  - type: textarea
+    id: gate
+    attributes:
+      label: The gate that passed
+      description: Command and raw output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: Why the green result did not prove the claim
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Did WinCreator catch it?
+      options:
+        - "Yes - review returned INSUFFICIENT or DISPROVEN"
+        - "Yes - the adequacy gate returned INSUFFICIENT"
+        - "No - it was marked EVIDENCED"
+        - "Not using WinCreator at the time"
+    validations:
+      required: true

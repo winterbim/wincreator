@@ -22,6 +22,8 @@ that skill root unless stated otherwise; project-level machinery
 - Capture/review : `python3 skill/wincreator/scripts/wincreator.py prove`,
   puis `review`, puis `verify` (`--self-test` avant confiance)
 - Conformité du package : `python3 skill/wincreator/scripts/package_check.py skill/wincreator`
+- Done Gate (hook d'arrêt, action CI, CLI) : `python3 skill/wincreator/scripts/done_gate.py`
+  (`--self-test` avant confiance ; le plugin est déclaré dans `.claude-plugin/` et `hooks/hooks.json`)
 
 La chaîne complète : **usage réel → catch (Skeptic) → capitalisation
 (Retro-Analyst) → récurrence prouvée → proposition → chirurgie gated

@@ -1,0 +1,31 @@
+name: Bug report
+description: A script or the protocol does something other than what the docs say
+labels: ["bug"]
+body:
+  - type: textarea
+    id: claim
+    attributes:
+      label: What you expected (the claim)
+      description: One sentence. What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What happened (the raw evidence)
+      description: The exact command and its unedited output. Remove secrets first.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WinCreator version
+      description: Output of `python3 scripts/wincreator.py --version`
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS, Python version, agent runtime
+      placeholder: "macOS 15, Python 3.12, Claude Code 2.1.x"
