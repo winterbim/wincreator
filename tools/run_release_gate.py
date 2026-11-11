@@ -28,6 +28,8 @@ def main():
     run([PYTHON, "bench/run_ablation.py", "--self-test"])
     run([PYTHON, "bench/validate_cases.py"])
     run([PYTHON, "bench/adapters/codex_exec.py", "--self-test"])
+    run([PYTHON, "bench/adapters/claude_code.py", "--self-test"])
+    run([PYTHON, "bench/analyze.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "--self-test"])
     run([PYTHON, "skill/wincreator/scripts/package_check.py", "skill/wincreator"])
     for ledger in (

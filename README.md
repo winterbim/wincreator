@@ -149,7 +149,8 @@ If you cannot name why the task needs Standard, use Lite.
 
 - **Proven, mechanically:** the tools do what this page says. Every script ships an adversarial self-test, the external suite runs on Ubuntu, Windows and macOS across Python 3.10–3.13, and this repository's own ledgers pass its own Done Gate on every push.
 - **Proven, once, on a real session:** a Skeptic caught a missing error path after green tests — [`worked-example.md`](skill/wincreator/references/worked-example.md).
-- **Not proven yet:** that an agent with WinCreator ON produces better verified outcomes than the same agent with it OFF. The paired harness exists under [`bench/`](bench/README.md); no result is published, and the current cases are infrastructure smoke tests. Until repeated runs are published, treat “it makes agents better” as `CLAIMED`.
+- **Measured, and not in our favor:** on 11 small false-green tasks, Claude Code with Claude Haiku 5.5 passed 33/33 held-out graders with WinCreator ON and 33/33 with it OFF, with zero false “done” reports in either arm; the ON arm cost 57% more. The benchmark hit its ceiling, so it shows no benefit at this task size. [Result and raw data](bench/results/2026-11-11-claude-code-haiku-5-5/README.md).
+- **Not measured:** long sessions, large repositories, weaker models, other agents, and the value of the audit trail to a human reviewer. Treat “it makes agents better” as `CLAIMED` until a benchmark that does not saturate says otherwise.
 
 ## The full protocol
 

@@ -90,6 +90,29 @@ Codex CLI has had non-TTY stdin regressions in automation environments. The
 adapter supplies `DEVNULL` explicitly, so a positional prompt cannot hang while
 waiting for inherited stdin.
 
+## Claude Code adapter
+
+~~~bash
+export WINCREATOR_BENCH_MODEL="<exact-model-id-or-alias>"
+python3 bench/run_ablation.py --output bench-results/claude --repetitions 3 \
+  --condition both --jobs 8 -- python3 "$PWD/bench/adapters/claude_code.py"
+python3 bench/analyze.py bench-results/claude/bundle.json
+~~~
+
+Pass the adapter by absolute path: the agent command runs inside each workspace.
+The adapter never bypasses permissions, records the provider-reported model,
+whether the ON arm actually opened or executed the skill, and any tool input
+naming a path outside the workspace. `--jobs` runs independent workspaces in
+parallel; `--case` restricts the run.
+
+## Published results
+
+| Date | Agent / model | Cases | OFF pass | ON pass | Finding |
+|---|---|---|---|---|---|
+| 2026-11-11 | Claude Code / Claude Haiku 5.5 | 005–015, 3 reps | 33/33 | 33/33 | [ceiling: no measurable effect, ON costs 57% more](results/2026-11-11-claude-code-haiku-5-5/README.md) |
+
+A result is added here whatever it shows.
+
 ## Oracle isolation
 
 The grader is executed by the harness **after** the agent and is never copied into the workspace. That is held-out-by-runner isolation, not a security boundary: a local agent process could still traverse outside its working directory.
@@ -105,7 +128,15 @@ The initial corpus targets small failure classes that coding agents commonly mis
 3. stable uniqueness with unhashable values;
 4. typed configuration precedence.
 
-These are infrastructure smoke cases, not enough for a frontier claim. The planned corpus also includes real-repository bug fixes, green-test behavior drift, dependency substitution, stale/fabricated evidence, scope omission, cross-platform failures, flaky checks and provenance mismatch.
+Cases 005–015 add false-green traps with a required completion report: weak
+visible tests (005–009), requirements that cannot be verified in the workspace
+(010–011), a green suite on the wrong module (012), a buried spec amendment
+(013), a flaky gate (014) and a mock that hides the bug (015).
+`tests/test_bench_cases.py` proves each grader accepts a reference solution and
+rejects the shortcut it targets. Claude Haiku 5.5 solves all of them in both
+arms, so they are now known to be **too easy to discriminate**.
+
+Cases 001–004 are infrastructure smoke cases, not enough for a frontier claim. The planned corpus also includes real-repository bug fixes, green-test behavior drift, dependency substitution, stale/fabricated evidence, scope omission, cross-platform failures, flaky checks and provenance mismatch.
 
 ## Comparison corpus
 

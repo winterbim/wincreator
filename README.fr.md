@@ -124,7 +124,8 @@ Si vous ne savez pas dire pourquoi la tâche exige Standard, utilisez Lite. `Reg
 
 - **Prouvé, mécaniquement :** les outils font ce que cette page décrit. Chaque script embarque un auto-test adversarial, la suite externe tourne sur Ubuntu, Windows et macOS avec Python 3.10 à 3.13, et les ledgers de ce dépôt passent sa propre Done Gate à chaque push.
 - **Prouvé, une fois, sur une vraie session :** un Skeptic a attrapé un chemin d'erreur manquant après des tests verts — [`worked-example.md`](skill/wincreator/references/worked-example.md).
-- **Pas encore prouvé :** qu'un agent avec WinCreator activé produit de meilleurs résultats vérifiés que le même agent sans. Le banc d'essai apparié existe dans [`bench/`](bench/README.md) ; aucun résultat n'est publié. D'ici là, « ça rend les agents meilleurs » reste `CLAIMED`.
+- **Mesuré, et pas en notre faveur :** sur 11 petites tâches à faux vert, Claude Code avec Claude Haiku 5.5 réussit 33/33 évaluations cachées avec WinCreator activé et 33/33 sans, avec zéro faux « terminé » dans les deux bras ; le bras activé coûte 57 % de plus. Le banc a plafonné : il ne montre aucun bénéfice à cette taille de tâche. [Résultat et données brutes](bench/results/2026-11-11-claude-code-haiku-5-5/README.md).
+- **Non mesuré :** sessions longues, gros dépôts, modèles plus faibles, autres agents, et la valeur de la piste d'audit pour un relecteur humain. « Ça rend les agents meilleurs » reste `CLAIMED` tant qu'un banc qui ne plafonne pas n'a pas dit le contraire.
 
 ## Aller plus loin
 

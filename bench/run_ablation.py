@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -289,7 +290,8 @@ def summarize(results):
     return summary
 
 
-def run_benchmark(manifest_path, agent_template, output, repetitions=3, condition="both"):
+def run_benchmark(manifest_path, agent_template, output, repetitions=3, condition="both",
+                  jobs=1, only_cases=None):
     manifest_path = Path(manifest_path).resolve()
     manifest = load_manifest(manifest_path)
     manifest_dir = manifest_path.parent
@@ -298,18 +300,37 @@ def run_benchmark(manifest_path, agent_template, output, repetitions=3, conditio
         raise ValueError(f"output already exists: {output_root}")
     output_root.mkdir(parents=True)
     conditions = ["off", "on"] if condition == "both" else [condition]
-    results = []
-    for repetition in range(1, repetitions + 1):
-        for case in manifest["cases"]:
-            for current in conditions:
-                results.append(
-                    run_case(case, manifest_dir, current, repetition, agent_template, output_root)
-                )
+    cases = manifest["cases"]
+    if only_cases:
+        unknown = sorted(set(only_cases) - {case["id"] for case in cases})
+        if unknown:
+            raise ValueError(f"unknown case id(s): {unknown}")
+        cases = [case for case in cases if case["id"] in set(only_cases)]
+    plan = [
+        (case, current, repetition)
+        for repetition in range(1, repetitions + 1)
+        for case in cases
+        for current in conditions
+    ]
+
+    def execute(item):
+        case, current, repetition = item
+        return run_case(case, manifest_dir, current, repetition, agent_template, output_root)
+
+    if jobs > 1:
+        # Runs are independent workspaces; parallelism changes wall-clock only.
+        # Result order stays the plan order, so the bundle digest is stable.
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            results = list(pool.map(execute, plan))
+    else:
+        results = [execute(item) for item in plan]
     bundle = {
         "schema": "wincreator.ablation-bundle/v1",
         "manifest_sha256": file_sha(manifest_path),
         "repetitions": repetitions,
         "conditions": conditions,
+        "cases": [case["id"] for case in cases],
+        "jobs": jobs,
         "results": results,
         "summary": summarize(results),
     }
@@ -405,6 +426,10 @@ def main(argv=None):
     parser.add_argument("--output")
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--condition", choices=("off", "on", "both"), default="both")
+    parser.add_argument("--jobs", type=int, default=1,
+                        help="independent runs executed in parallel (wall-clock only)")
+    parser.add_argument("--case", action="append", default=[],
+                        help="restrict the run to this case id (repeatable)")
     parser.add_argument("agent_command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.self_test:
@@ -420,7 +445,8 @@ def main(argv=None):
         parser.error("--repetitions must be >= 1")
     try:
         bundle = run_benchmark(
-            args.manifest, command, args.output, args.repetitions, args.condition
+            args.manifest, command, args.output, args.repetitions, args.condition,
+            jobs=max(1, args.jobs), only_cases=args.case or None,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"BENCHMARK ERROR: {exc}", file=sys.stderr)
