@@ -12,6 +12,8 @@ history remains available in Git and is not restated here.
 ## [Unreleased]
 
 ### Added
+- First published ON/OFF result (`bench/results/2026-11-11-claude-code-haiku-5-5/`): Claude Code with Claude Haiku 5.5 passes 33/33 held-out graders in both arms on cases 005–015, with zero false "done" reports; the ON arm costs 57% more. A ceiling result, published as measured.
+- Benchmark: Claude Code adapter, `bench/analyze.py`, `--jobs`/`--case` on the runner, and 11 false-green cases (005–015) whose graders are proven satisfiable and shortcut-rejecting by `tests/test_bench_cases.py`.
 - Done Gate: `scripts/done_gate.py` applies the ledger gate to every ledger of a project and is exposed three ways: a Claude Code plugin stop hook that sends the agent back to work when it tries to finish over `CLAIMED`, `DISPROVEN` or `INSUFFICIENT` rows (once per stop, once per session for a given set of open claims, fail-open, `WINCREATOR_DONE_GATE=off`), a composite GitHub Action (`uses: winterbim/wincreator@<ref>`) with a claims table in the job summary, and a plain CLI exit code. `references/done-gate.md` documents behavior and limits.
 - Claude Code plugin and marketplace manifests (`.claude-plugin/`, `hooks/hooks.json`): one install provides the skill and the Done Gate.
 - `examples/false-green/`: a deterministic, dependency-free demo in which a passing check is judged `INSUFFICIENT` by the Evidence Adequacy Gate, then `ADEQUATE` after one added check. The README transcripts and the animated hero SVG are generated from its real output and CI fails when they drift.

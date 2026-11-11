@@ -65,7 +65,9 @@ def row(result):
         "turns": metrics.get("num_turns"),
         "uptake": bool(metrics.get("treatment_uptake")),
         "scripts": metrics.get("skill_scripts_executed") or [],
-        "outside": metrics.get("outside_workspace_paths") or [],
+        # URL paths recorded by adapter versions that did not exclude them are not file access.
+        "outside": [path for path in (metrics.get("outside_workspace_paths") or [])
+                    if "." not in path.lstrip("/").split("/", 1)[0]],
         "models": metrics.get("served_models") or [],
         "requested_model": metrics.get("requested_model"),
         "version": (result.get("treatment") or {}).get("wincreator_version"),

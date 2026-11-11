@@ -37,7 +37,7 @@ SKILL_SCRIPTS = (
     "quick_prove.py", "wincreator.py", "ledger_check.py", "adequacy_check.py",
     "challenge_packet.py", "distill_check.py", "done_gate.py",
 )
-ABSOLUTE_PATH = re.compile(r"(?<![\w.~-])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
+ABSOLUTE_PATH = re.compile(r"(?<![\w.~:/-])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
 SYSTEM_PREFIXES = ("/usr/", "/bin/", "/dev/", "/proc/", "/tmp/", "/etc/", "/opt/", "/lib", "/sbin/", "/var/")
 
 
@@ -242,6 +242,8 @@ def self_test():
             {"type": "tool_use", "name": "Read", "input": {"file_path": "/repo/bench/cases/x/grader.py"}},
             {"type": "tool_use", "name": "Bash", "input": {"command": "/usr/bin/python3 test_x.py"}},
             {"type": "tool_use", "name": "Bash",
+             "input": {"command": "echo https://rates.internal.example/v2/rates/USD"}},
+            {"type": "tool_use", "name": "Bash",
              "input": {"command": "cat .agents/skills/wincreator/references/agents.md"}},
             {"type": "text", "text": "done"},
         ]}},
@@ -251,7 +253,7 @@ def self_test():
     ]) + "\nnot json\n"
     parsed = parse_trace(trace, workspace)
     assert parsed["parse_errors"] == 1
-    assert parsed["tool_calls"] == 5
+    assert parsed["tool_calls"] == 6
     assert parsed["skill_files_read"] == ["SKILL.md", "references/agents.md"]
     assert parsed["skill_scripts_executed"] == ["quick_prove.py"]
     assert parsed["treatment_uptake"] is True
