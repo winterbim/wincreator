@@ -1,0 +1,23 @@
+name: proof-ledger
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  done-gate:
+    name: done-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Gate this repository's own ledgers with its own action
+        uses: ./
+        with:
+          require-ledger: "true"

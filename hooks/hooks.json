@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/skill/wincreator/scripts/done_gate.py --hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

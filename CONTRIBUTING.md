@@ -9,11 +9,11 @@ the strength of "it works." Two things are required of every pull request.
 python3 skill/wincreator/scripts/ledger_check.py --self-test
 python3 skill/wincreator/scripts/wincreator.py --self-test
 python3 skill/wincreator/scripts/distill_check.py --self-test
+python3 skill/wincreator/scripts/done_gate.py --self-test
 python3 skill/wincreator/scripts/package_check.py --self-test
 python3 -m pytest -q
 python3 skill/wincreator/scripts/package_check.py skill/wincreator
-python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER.md
-python3 skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v3-proof-capture.md
+python3 skill/wincreator/scripts/done_gate.py
 python3 skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
 ```
 

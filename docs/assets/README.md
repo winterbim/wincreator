@@ -5,6 +5,7 @@ No binary raster required.
 
 | File | Purpose |
 |------|---------|
+| [`false-green.svg`](false-green.svg) | README hero: animated transcript of the false-green demo. **Generated** by `tools/render_demo_svg.py` from real output; do not edit by hand |
 | [`before-after.svg`](before-after.svg) | Assertion vs proof |
 | [`flow-prove-review.svg`](flow-prove-review.svg) | Claim → prove → review → gate |
 | [`tiers.svg`](tiers.svg) | Lite / Standard / Regulated |

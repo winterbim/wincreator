@@ -1,0 +1,11 @@
+{
+  "schema": "wincreator.adequacy-manifest/v1",
+  "mutations": [
+    {
+      "id": "refund-cap-removed",
+      "path": "refund.py",
+      "find": "min(requested, paid)",
+      "replace": "requested"
+    }
+  ]
+}

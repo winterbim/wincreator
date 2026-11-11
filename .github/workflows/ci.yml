@@ -38,6 +38,7 @@ jobs:
           python skill/wincreator/scripts/distill_check.py --self-test
           python skill/wincreator/scripts/adequacy_check.py self-test
           python skill/wincreator/scripts/challenge_packet.py self-test
+          python skill/wincreator/scripts/done_gate.py --self-test
           python bench/run_ablation.py --self-test
           python bench/validate_cases.py
           python bench/adapters/codex_exec.py --self-test
@@ -54,6 +55,10 @@ jobs:
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v2-install.md
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-evolution.md
           python skill/wincreator/scripts/ledger_check.py PROOF_LEDGER-v3-proof-capture.md
+      - name: Run the false-green demo and check the README hero is current
+        run: |
+          python examples/false-green/run_demo.py
+          python tools/render_demo_svg.py --check
       - name: Check live retro-loop catches
         run: python skill/wincreator/scripts/ledger_check.py --catches skill/wincreator/SKEPTIC_CATCHES.md
       - name: Build package on this platform

@@ -814,7 +814,13 @@ def run_and_attest(
     _atomic_json(attestation_path, attestation)
 
     if ledger:
-        evidence = capture_evidence_sentence(payload, attestation_path, digest, cwd)
+        # Paths in the Evidence cell are relative to the ledger's own directory,
+        # exactly as `review` writes them and `verify` re-derives them. Using the
+        # process cwd here made `verify` reject every un-reviewed capture whose
+        # ledger lives in a subdirectory (the quick_prove default).
+        evidence = capture_evidence_sentence(
+            payload, attestation_path, digest, os.path.dirname(os.path.abspath(ledger))
+        )
         if capture_status == "CAPTURED_PASS":
             ledger_status = "PENDING"
         elif capture_status == "CAPTURED_FAIL":

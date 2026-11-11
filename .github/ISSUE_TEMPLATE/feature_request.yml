@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose a change to the protocol or the tooling
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: failure
+    attributes:
+      label: The failure this would prevent
+      description: A concrete, observed failure is stronger than a hypothetical one.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed mechanism
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it costs
+      description: Added ceremony, files, runtime. A mechanism must earn its complexity.

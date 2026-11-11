@@ -3,6 +3,17 @@
 The demo should make one idea obvious: **green is not the same thing as proven**.
 Use real output only.
 
+## Fastest version (no narration needed)
+
+The animated transcript at the top of the README is generated from this command;
+running it live makes the same point in five seconds:
+
+```bash
+python3 examples/false-green/run_demo.py
+```
+
+The longer script below shows the claim/capture/review flow on the same idea.
+
 ## Setup
 
 ```bash

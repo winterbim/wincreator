@@ -12,10 +12,23 @@ history remains available in Git and is not restated here.
 ## [Unreleased]
 
 ### Added
+- Done Gate: `scripts/done_gate.py` applies the ledger gate to every ledger of a project and is exposed three ways: a Claude Code plugin stop hook that sends the agent back to work when it tries to finish over `CLAIMED`, `DISPROVEN` or `INSUFFICIENT` rows (once per stop, once per session for a given set of open claims, fail-open, `WINCREATOR_DONE_GATE=off`), a composite GitHub Action (`uses: winterbim/wincreator@<ref>`) with a claims table in the job summary, and a plain CLI exit code. `references/done-gate.md` documents behavior and limits.
+- Claude Code plugin and marketplace manifests (`.claude-plugin/`, `hooks/hooks.json`): one install provides the skill and the Done Gate.
+- `examples/false-green/`: a deterministic, dependency-free demo in which a passing check is judged `INSUFFICIENT` by the Evidence Adequacy Gate, then `ADEQUATE` after one added check. The README transcripts and the animated hero SVG are generated from its real output and CI fails when they drift.
+- `proof-ledger` workflow: this repository gates its own ledgers with its own action on every push and pull request.
+- French README (`README.fr.md`), `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue forms and a pull-request template carrying the Skeptic pass.
 - Codex CLI benchmark adapter: explicit model/reasoning settings, ephemeral JSONL execution, closed stdin, safe workspace-write sandboxing, normalized token metrics, and treatment identity capture for real WinCreator ON/OFF runs.
 - Frontier benchmark v1: pinned public comparison corpus, RED-before-agent case validation, and a paired same-agent WinCreator ON/OFF runner that preserves raw results without inventing a universal quality score.
 - Blind Challenge Packet + review v3: Standard/Regulated reviews must bind a retained, digest-verified reviewer packet that omits Builder identity/context metadata; historical review v1/v2 records remain verifiable.
 - Evidence Adequacy Gate: deterministic isolated fault injection verifies that a declared behavior gate can actually detect claim-relevant seeded regressions; required survivors produce `INSUFFICIENT` and reports are digest-bound.
+
+### Fixed
+- `prove` wrote capture evidence paths relative to the process working directory while `review` and `verify` used the ledger's directory. For any ledger outside the working directory — the `quick_prove` default `.wincreator/PROOF_LEDGER.md` — `verify` reported un-reviewed captures as "evidence does not uniquely identify one valid capture/review chain" instead of their real `PENDING`/`DISPROVEN` state. Capture evidence is now ledger-relative like the rest of the chain.
+- README "Manual capture API" review command had a misplaced line continuation and omitted the challenge packet that Standard reviews require.
+
+### Changed
+- `quick_prove --tier standard` prints the two exact follow-up commands (challenge packet, review) instead of a one-line reminder.
+- README leads with the runnable false-green demo and states what is and is not yet proven about WinCreator itself.
 
 ## [3.1.0] — 2026-09-27
 
