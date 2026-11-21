@@ -168,7 +168,7 @@ Review:
 python3 "$WC/scripts/wincreator.py" review P2 \
   --ledger PROOF_LEDGER.md \
   --verdict evidenced \
-  --reviewer skeptic-01
+  --reviewer skeptic-01 \
   --challenge "attack whether the captured gate is sufficient for the exact claim" \
 ```
 
@@ -288,6 +288,8 @@ CI runs across Ubuntu, Windows and macOS on Python 3.10–3.13 and validates the
 | [`skill/wincreator/references/worked-example.md`](skill/wincreator/references/worked-example.md) | real Skeptic catch |
 | [`skill/wincreator/SKILL.md`](skill/wincreator/SKILL.md) | full protocol |
 | [`docs/DEMO.md`](docs/DEMO.md) | short demonstration flow |
+| [`docs/marketing-plan.md`](docs/marketing-plan.md) | distribution plan and honest-claims rules |
+| [`.claude/agents/wincreator-marketer.md`](.claude/agents/wincreator-marketer.md) | agent that runs launch rounds and tracks install metrics |
 | [Releases](https://github.com/winterbim/wincreator/releases) | packaged artifacts |
 
 ## License
