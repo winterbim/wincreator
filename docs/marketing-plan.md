@@ -18,8 +18,8 @@ Marketing that violates them destroys the product.
 3. Every public post contains the one-line install command
    (`npx skills add winterbim/wincreator`) so the post maps to a
    countable install on skills.sh.
-4. No launch post is published unreviewed. The draft lives in
-   `docs/launch/`; a human or the user-approved channel account posts it.
+4. No launch post is published unreviewed. The drafts live in
+   `docs/marketing/`; a human or the user-approved channel account posts it.
 
 ## Measured starting point (as of 2026-11)
 
