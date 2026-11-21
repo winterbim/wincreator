@@ -1,0 +1,25 @@
+name: launch-digest
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build launch packet
+        run: python tools/launch_digest.py --tag "${GITHUB_REF_NAME:-latest}" --out dist/launch-digest.md
+      - name: Upload packet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-digest-${{ github.run_id }}
+          path: dist/launch-digest.md
